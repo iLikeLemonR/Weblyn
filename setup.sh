@@ -6,6 +6,17 @@ if [ "$(id -u)" -ne 0 ]; then
     exit 1
 fi
 
+# 5. Prompt user for username and password for login
+echo "Enter a username for the login page:"
+read USERNAME
+echo "Enter a password for the login page:"
+read -s PASSWORD
+
+# Save credentials to a .env file for later use (secure storage for simplicity)
+echo "USERNAME=$USERNAME" > /var/www/html/.env
+echo "PASSWORD=$(openssl passwd -crypt $PASSWORD)" >> /var/www/html/.env
+echo "Username and Password have been saved!"
+
 # 1. Reinstall and fully set up NGINX
 echo "Reinstalling NGINX and ensuring correct setup..."
 sudo apt-get update
@@ -110,16 +121,6 @@ else
     echo "NGINX failed to start. Please check the logs."
     exit 1
 fi
-
-# 5. Prompt user for username and password for login
-echo "Enter a username for the login page:"
-read USERNAME
-echo "Enter a password for the login page:"
-read -s PASSWORD
-
-# Save credentials to a .env file for later use (secure storage for simplicity)
-echo "USERNAME=$USERNAME" > /var/www/html/.env
-echo "PASSWORD=$(openssl passwd -crypt $PASSWORD)" >> /var/www/html/.env
 
 # 6. Pull the login.html and dashboard.html pages to the correct directory
 echo "Pulling login.html and dashboard.html..."

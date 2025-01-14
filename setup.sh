@@ -11,16 +11,14 @@ echo "Reinstalling NGINX and ensuring correct setup..."
 sudo apt-get update
 sudo apt-get install --reinstall -y nginx-full nginx-common
 
-# Ensure necessary NGINX directories exist
+# 2. Ensure necessary NGINX directories exist
 echo "Ensuring necessary NGINX directories exist..."
 mkdir -p /var/www/html
 mkdir -p /etc/nginx/sites-available
 mkdir -p /etc/nginx/sites-enabled
 mkdir -p /var/log/nginx
-
-# 2. Pull the index.html to the correct directory
-echo "Pulling index.html from GitHub..."
-wget -q -O /var/www/html/index.html https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/index.html
+mkdir -p /var/www/html/session_tokens
+chmod 700 /var/www/html/session_tokens
 
 # 3. Ensure the NGINX service exists and is running
 echo "Ensuring NGINX service is set up and running..."
@@ -38,8 +36,7 @@ get_local_ip() {
 LOCAL_IP=$(get_local_ip)
 
 # Update the index.html file dynamically with the local IP
-sed -i "s|http://localhost:8080/metrics|http://$LOCAL_IP:8080/metrics|g" /var/www/html/index.html
-
+sed -i "s|http://localhost:8080/metrics|http://$LOCAL_IP:8080/metrics|g" /var/www/html/dashboard.html
 
 # Restart and enable NGINX service
 systemctl restart nginx
@@ -52,57 +49,26 @@ else
     exit 1
 fi
 
-# 4. Check if Go is installed
-echo "Checking if Go is installed..."
-if ! command -v go &> /dev/null; then
-    echo "Go is not installed. Installing Go..."
-    
-    # Fetch the latest Go version dynamically
-    LATEST_GO_VERSION=$(curl -s https://go.dev/VERSION?m=text | cut -d 't' -f1)
-    if [ -z "$LATEST_GO_VERSION" ]; then
-        echo "Failed to fetch the latest Go version. Exiting..."
-        exit 1
-    fi
-    
-    # Construct the download URL and tarball name
-    GO_TARBALL="${LATEST_GO_VERSION}.linux-amd64.tar.gz"
-    GO_DOWNLOAD_URL="https://golang.org/dl/${GO_TARBALL}"
-    
-    # Download and install Go
-    curl -L -o "$GO_TARBALL" "$GO_DOWNLOAD_URL" 2>&1 | tee download.log
-    if [ $? -ne 0 ]; then
-        echo "Failed to download Go tarball. See download.log for details."
-        exit 1
-    fi
+# 4. Prompt user for username and password for login
+echo "Enter a username for the login page:"
+read USERNAME
+echo "Enter a password for the login page:"
+read -s PASSWORD
 
-    # Extract and install Go
-    tar -C /usr/local -xvzf "$GO_TARBALL"
-    rm -f "$GO_TARBALL"  # Delete the tarball after installation
-    echo "Go has been installed."
+# Save credentials to a .env file for later use (secure storage for simplicity)
+echo "USERNAME=$USERNAME" > /var/www/html/.env
+echo "PASSWORD=$(openssl passwd -crypt $PASSWORD)" >> /var/www/html/.env
 
-    # Update the PATH for Go
-    echo "export PATH=\$PATH:/usr/local/go/bin" >> ~/.bashrc
-    export PATH=$PATH:/usr/local/go/bin
-else
-    echo "Go is already installed."
-fi
+# 5. Pull the login.html and dashboard.html pages to the correct directory
+echo "Pulling login.html and dashboard.html..."
+wget -q -O /var/www/html/login.html https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/login.html
+wget -q -O /var/www/html/dashboard.html https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/dashboard.html
 
-# 5. Pull the Go script to the correct directory
-echo "Pulling statsPuller.go from GitHub..."
-USER_HOME=$(eval echo ~$SUDO_USER)
-mkdir -p "$USER_HOME/RemoteAccess/GoFiles"
-wget -q -O "$USER_HOME/RemoteAccess/GoFiles/statsPuller.go" https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/statsPuller.go
+# 6. Pull login.php from GitHub
+echo "Pulling login.php from GitHub..."
+wget -q -O /var/www/html/login.php https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/login.php
 
-# 6. Download required Go dependencies
-echo "Downloading Go dependencies..."
-cd "$USER_HOME/RemoteAccess/GoFiles"
-go mod init system-stats
-go get github.com/shirou/gopsutil/cpu
-go get github.com/shirou/gopsutil/mem
-go get github.com/shirou/gopsutil/disk
-go get github.com/tklauser/go-sysconf
-
-# 7. Set up NGINX to serve index.html and proxy to Go service
+# 7. Set up NGINX to serve login.html and dashboard.html with authentication
 NGINX_CONFIG="/etc/nginx/sites-available/remoteaccess"
 if [ ! -f "$NGINX_CONFIG" ]; then
     echo "Setting up NGINX configuration for remote access..."
@@ -112,13 +78,45 @@ server {
     listen 80;
     server_name localhost;
 
-    location / {
+    # Location for login page
+    location /login.html {
         root /var/www/html;
-        index index.html;
+        try_files $uri $uri/ =404;
     }
 
-    location /metrics {
-        proxy_pass http://localhost:8080;
+    # Location for the login script (login.php)
+    location /login.php {
+        root /var/www/html;
+        fastcgi_pass unix:/var/run/php/php7.4-fpm.sock;  # Adjust PHP-FPM version if needed
+        fastcgi_index login.php;
+        fastcgi_param SCRIPT_FILENAME /var/www/html$fastcgi_script_name;
+        include fastcgi_params;
+    }
+
+    # Protect dashboard.html (only accessible after login via secure session token)
+    location /dashboard.html {
+        root /var/www/html;
+        try_files $uri $uri/ =404;
+
+        # Check if session_token cookie exists and is valid
+        set $allowed 0;
+        if ($cookie_session_token) {
+            # Verify the session token by checking the hidden file
+            set $token_file /var/www/html/session_tokens/$cookie_session_token;
+            if (-f $token_file) {
+                set $allowed 1;
+            }
+        }
+
+        if ($allowed = 0) {
+            return 403;  # Forbidden if the token is not valid
+        }
+    }
+
+    # Default location (root should serve login.html as the entry point)
+    location / {
+        root /var/www/html;
+        index login.html;
     }
 }
 EOF
@@ -130,39 +128,12 @@ else
     echo "NGINX configuration for remoteaccess already exists."
 fi
 
-# 8. Set up the Go script to run on startup
-SYSTEMD_SERVICE="/etc/systemd/system/go-stats-puller.service"
-if [ ! -f "$SYSTEMD_SERVICE" ]; then
-    echo "Setting up Go script to run on startup..."
-
-    # Create systemd service for Go script
-    cat > $SYSTEMD_SERVICE <<EOF
-[Unit]
-Description=Go Stats Puller
-After=network.target
-
-[Service]
-ExecStart=/usr/local/go/bin/go run $USER_HOME/RemoteAccess/GoFiles/statsPuller.go
-WorkingDirectory=$USER_HOME/RemoteAccess/GoFiles
-Restart=always
-User=$SUDO_USER
-group=www-data
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-    # Enable and start the service
-    systemctl daemon-reload
-    systemctl enable go-stats-puller.service
-    systemctl start go-stats-puller.service
-else
-    echo "Go script is already set up to run on startup."
-fi
+# 8. Install required packages (PHP, MySQLi extension, etc.)
+echo "Installing PHP, MySQLi, and related packages..."
+sudo apt-get install -y php-fpm php-mysqli
 
 # 9. Final message
 echo "Setup completed successfully."
-echo "NGINX is configured to serve index.html and forward /metrics requests to the Go server."
-echo "The Go script is set to run on startup."
-echo "You can visit the site at http://localhost and access the metrics at http://localhost/metrics."
-# another test comment
+echo "NGINX is configured to serve login.html and dashboard.html with authentication."
+echo "The login system is set up with hardcoded credentials (for now)."
+echo "You can visit the site at http://localhost, and the dashboard will be accessible after logging in."

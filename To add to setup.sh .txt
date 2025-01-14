@@ -1,6 +1,0 @@
-sudo apt-get install apache2-utils
-sudo apt install php-fpm php-mysql
-
-sudo htpasswd -c /etc/nginx/.htpasswd username            #test with username. later on change the username
-
-sudo systemctl restart nginx

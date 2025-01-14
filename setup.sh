@@ -45,23 +45,25 @@ server {
         include fastcgi_params;
     }
 
+    # Map directive to determine if the session token exists
+    map $cookie_session_token $allowed {
+        default 0;
+        "~.*" 1;  # Allow if the session token exists
+    }
+
     # Protect dashboard.html (only accessible after login via secure session token)
     location /dashboard.html {
         root /var/www/html;
         try_files $uri $uri/ =404;
 
-        # Check if session_token cookie exists and is valid
-        set $allowed 0;
-        if ($cookie_session_token) {
-            # Verify the session token by checking the hidden file
-            set $token_file /var/www/html/session_tokens/$cookie_session_token;
-            if (-f $token_file) {
-                set $allowed 1;
-            }
-        }
-
-        if ($allowed = 0) {
-            return 403;  # Forbidden if the token is not valid
+        # Deny access if no valid session token using Lua
+        access_by_lua_block {
+            local token_file = "/var/www/html/session_tokens/" .. ngx.var.cookie_session_token
+            local file = io.open(token_file, "r")
+            if not file then
+                ngx.exit(403)  # Forbidden if the token is not valid
+            end
+            file:close()
         }
     }
 
@@ -71,6 +73,7 @@ server {
         index login.html;
     }
 }
+
 EOF
 
 # 3. Ensure the NGINX service exists and is running

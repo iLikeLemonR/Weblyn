@@ -26,11 +26,18 @@ if [ ! -f "$NGINX_CONFIG" ]; then
     echo "Setting up NGINX configuration for remote access..."
 
     cat > $NGINX_CONFIG <<EOF
+<<<<<<< HEAD
 # Define a map to check if the session token is valid
 map $cookie_session_token $allowed {
     default 0;
     # Match if the session token file exists
     ~^(.+)$ /var/www/html/session_tokens/$1;
+=======
+# Define the map directive at the HTTP level
+map $cookie_session_token $allowed {
+    default 0;   # Default to not allowed
+    "~.*" 1;     # Allow if a session token exists
+>>>>>>> 208da02bc34bfcc541ebd84ff373728ccf9280ca
 }
 
 server {
@@ -57,9 +64,23 @@ server {
         root /var/www/html;
         try_files $uri $uri/ =404;
 
+<<<<<<< HEAD
         # Check if session_token cookie exists and is valid
+=======
+        # Deny access if no valid session token
+>>>>>>> 208da02bc34bfcc541ebd84ff373728ccf9280ca
         if ($allowed = 0) {
             return 403;  # Forbidden if the token is not valid
+        }
+
+        # Additional token validation using Lua
+        access_by_lua_block {
+            local token_file = "/var/www/html/session_tokens/" .. ngx.var.cookie_session_token
+            local file = io.open(token_file, "r")
+            if not file then
+                ngx.exit(403)  # Forbidden if the token file doesn't exist
+            end
+            file:close()
         }
     }
 

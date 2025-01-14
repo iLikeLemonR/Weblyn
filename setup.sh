@@ -20,12 +20,19 @@ mkdir -p /var/log/nginx
 mkdir -p /var/www/html/session_tokens
 chmod 700 /var/www/html/session_tokens
 
-# 7. Set up NGINX to serve login.html and dashboard.html with authentication
+# 3. Set up NGINX to serve login.html and dashboard.html with authentication
 NGINX_CONFIG="/etc/nginx/sites-available/remoteaccess"
 if [ ! -f "$NGINX_CONFIG" ]; then
     echo "Setting up NGINX configuration for remote access..."
 
     cat > $NGINX_CONFIG <<EOF
+# Define a map to check if the session token is valid
+map $cookie_session_token $allowed {
+    default 0;
+    # Match if the session token file exists
+    ~^(.+)$ /var/www/html/session_tokens/$1;
+}
+
 server {
     listen 80;
     server_name localhost;
@@ -51,15 +58,6 @@ server {
         try_files $uri $uri/ =404;
 
         # Check if session_token cookie exists and is valid
-        set $allowed 0;
-        if ($cookie_session_token) {
-            # Verify the session token by checking the hidden file
-            set $token_file /var/www/html/session_tokens/$cookie_session_token;
-            if (-f $token_file) {
-                set $allowed 1;
-            }
-        }
-
         if ($allowed = 0) {
             return 403;  # Forbidden if the token is not valid
         }
@@ -70,10 +68,16 @@ server {
         root /var/www/html;
         index login.html;
     }
+
+    # Location for metrics, served from localhost:8080/metrics
+    location /metrics {
+        proxy_pass http://localhost:8080/metrics;
+    }
 }
+
 EOF
 
-# 3. Ensure the NGINX service exists and is running
+# 4. Ensure the NGINX service exists and is running
 echo "Ensuring NGINX service is set up and running..."
 if ! systemctl is-enabled --quiet nginx; then
     echo "NGINX service does not exist. Creating and enabling the service..."
@@ -102,7 +106,7 @@ else
     exit 1
 fi
 
-# 4. Prompt user for username and password for login
+# 5. Prompt user for username and password for login
 echo "Enter a username for the login page:"
 read USERNAME
 echo "Enter a password for the login page:"
@@ -112,12 +116,12 @@ read -s PASSWORD
 echo "USERNAME=$USERNAME" > /var/www/html/.env
 echo "PASSWORD=$(openssl passwd -crypt $PASSWORD)" >> /var/www/html/.env
 
-# 5. Pull the login.html and dashboard.html pages to the correct directory
+# 6. Pull the login.html and dashboard.html pages to the correct directory
 echo "Pulling login.html and dashboard.html..."
 wget -q -O /var/www/html/login.html https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/login.html
 wget -q -O /var/www/html/dashboard.html https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/dashboard.html
 
-# 6. Pull login.php from GitHub
+# 7. Pull login.php from GitHub
 echo "Pulling login.php from GitHub..."
 wget -q -O /var/www/html/login.php https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/login.php
 

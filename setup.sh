@@ -26,6 +26,12 @@ if [ ! -f "$NGINX_CONFIG" ]; then
     echo "Setting up NGINX configuration for remote access..."
 
     cat > $NGINX_CONFIG <<EOF
+# Define the map directive at the HTTP level
+map $cookie_session_token $allowed {
+    default 0;   # Default to not allowed
+    "~.*" 1;     # Allow if a session token exists
+}
+
 server {
     listen 80;
     server_name localhost;
@@ -45,23 +51,22 @@ server {
         include fastcgi_params;
     }
 
-    # Map directive to determine if the session token exists
-    map $cookie_session_token $allowed {
-        default 0;
-        "~.*" 1;  # Allow if the session token exists
-    }
-
     # Protect dashboard.html (only accessible after login via secure session token)
     location /dashboard.html {
         root /var/www/html;
         try_files $uri $uri/ =404;
 
-        # Deny access if no valid session token using Lua
+        # Deny access if no valid session token
+        if ($allowed = 0) {
+            return 403;  # Forbidden if the token is not valid
+        }
+
+        # Additional token validation using Lua
         access_by_lua_block {
             local token_file = "/var/www/html/session_tokens/" .. ngx.var.cookie_session_token
             local file = io.open(token_file, "r")
             if not file then
-                ngx.exit(403)  # Forbidden if the token is not valid
+                ngx.exit(403)  # Forbidden if the token file doesn't exist
             end
             file:close()
         }
@@ -73,7 +78,6 @@ server {
         index login.html;
     }
 }
-
 EOF
 
 # 3. Ensure the NGINX service exists and is running

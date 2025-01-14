@@ -20,7 +20,7 @@ mkdir -p /var/log/nginx
 
 # 2. Pull the index.html to the correct directory
 echo "Pulling index.html from GitHub..."
-wget -q -O /var/www/html/index.html https://raw.githubusercontent.com/iLikeLemonR/Basic-Server-Setup/refs/heads/main/index.html
+wget -q -O /var/www/html/index.html https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/index.html
 
 # 3. Ensure the NGINX service exists and is running
 echo "Ensuring NGINX service is set up and running..."
@@ -91,7 +91,7 @@ fi
 echo "Pulling statsPuller.go from GitHub..."
 USER_HOME=$(eval echo ~$SUDO_USER)
 mkdir -p "$USER_HOME/RemoteAccess/GoFiles"
-wget -q -O "$USER_HOME/RemoteAccess/GoFiles/statsPuller.go" https://raw.githubusercontent.com/iLikeLemonR/Basic-Server-Setup/refs/heads/main/statsPuller.go
+wget -q -O "$USER_HOME/RemoteAccess/GoFiles/statsPuller.go" https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/statsPuller.go
 
 # 6. Download required Go dependencies
 echo "Downloading Go dependencies..."

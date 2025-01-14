@@ -20,54 +20,6 @@ mkdir -p /var/log/nginx
 mkdir -p /var/www/html/session_tokens
 chmod 700 /var/www/html/session_tokens
 
-# 3. Ensure the NGINX service exists and is running
-echo "Ensuring NGINX service is set up and running..."
-if ! systemctl is-enabled --quiet nginx; then
-    echo "NGINX service does not exist. Creating and enabling the service..."
-    systemctl enable nginx
-fi
-
-# Get local IP address function
-get_local_ip() {
-  ip addr show | grep -E 'inet.*brd' | awk '{print $2}' | cut -d/ -f1 | head -n 1
-}
-
-# Get the local IP
-LOCAL_IP=$(get_local_ip)
-
-# Update the index.html file dynamically with the local IP
-sed -i "s|http://localhost:8080/metrics|http://$LOCAL_IP:8080/metrics|g" /var/www/html/dashboard.html
-
-# Restart and enable NGINX service
-systemctl restart nginx
-
-# Check if NGINX is running
-if systemctl is-active --quiet nginx; then
-    echo "NGINX is running."
-else
-    echo "NGINX failed to start. Please check the logs."
-    exit 1
-fi
-
-# 4. Prompt user for username and password for login
-echo "Enter a username for the login page:"
-read USERNAME
-echo "Enter a password for the login page:"
-read -s PASSWORD
-
-# Save credentials to a .env file for later use (secure storage for simplicity)
-echo "USERNAME=$USERNAME" > /var/www/html/.env
-echo "PASSWORD=$(openssl passwd -crypt $PASSWORD)" >> /var/www/html/.env
-
-# 5. Pull the login.html and dashboard.html pages to the correct directory
-echo "Pulling login.html and dashboard.html..."
-wget -q -O /var/www/html/login.html https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/login.html
-wget -q -O /var/www/html/dashboard.html https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/dashboard.html
-
-# 6. Pull login.php from GitHub
-echo "Pulling login.php from GitHub..."
-wget -q -O /var/www/html/login.php https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/login.php
-
 # 7. Set up NGINX to serve login.html and dashboard.html with authentication
 NGINX_CONFIG="/etc/nginx/sites-available/remoteaccess"
 if [ ! -f "$NGINX_CONFIG" ]; then
@@ -120,6 +72,54 @@ server {
     }
 }
 EOF
+
+# 3. Ensure the NGINX service exists and is running
+echo "Ensuring NGINX service is set up and running..."
+if ! systemctl is-enabled --quiet nginx; then
+    echo "NGINX service does not exist. Creating and enabling the service..."
+    systemctl enable nginx
+fi
+
+# Get local IP address function
+get_local_ip() {
+  ip addr show | grep -E 'inet.*brd' | awk '{print $2}' | cut -d/ -f1 | head -n 1
+}
+
+# Get the local IP
+LOCAL_IP=$(get_local_ip)
+
+# Update the index.html file dynamically with the local IP
+sed -i "s|http://localhost:8080/metrics|http://$LOCAL_IP:8080/metrics|g" /var/www/html/dashboard.html
+
+# Restart and enable NGINX service
+systemctl restart nginx
+
+# Check if NGINX is running
+if systemctl is-active --quiet nginx; then
+    echo "NGINX is running."
+else
+    echo "NGINX failed to start. Please check the logs."
+    exit 1
+fi
+
+# 4. Prompt user for username and password for login
+echo "Enter a username for the login page:"
+read USERNAME
+echo "Enter a password for the login page:"
+read -s PASSWORD
+
+# Save credentials to a .env file for later use (secure storage for simplicity)
+echo "USERNAME=$USERNAME" > /var/www/html/.env
+echo "PASSWORD=$(openssl passwd -crypt $PASSWORD)" >> /var/www/html/.env
+
+# 5. Pull the login.html and dashboard.html pages to the correct directory
+echo "Pulling login.html and dashboard.html..."
+wget -q -O /var/www/html/login.html https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/login.html
+wget -q -O /var/www/html/dashboard.html https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/dashboard.html
+
+# 6. Pull login.php from GitHub
+echo "Pulling login.php from GitHub..."
+wget -q -O /var/www/html/login.php https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/login.php
 
     # Enable the site and restart NGINX
     ln -s /etc/nginx/sites-available/remoteaccess /etc/nginx/sites-enabled/

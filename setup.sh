@@ -31,11 +31,17 @@ map $cookie_session_token $allowed {
     ~^(.+)$ /var/www/html/session_tokens/$1;
 }
 
+# Map the session token to a valid state (0 for invalid, 1 for valid)
+map $cookie_session_token $session_token_valid {
+    default 0;  # Default to invalid
+    ~^(.+)$ /var/www/html/session_tokens/$1;  # Check if session token file exists
+}
+
 server {
     listen 80;
     server_name localhost;
 
-    # Location for login page
+    # Location for login page (login.html)
     location /login.html {
         root /var/www/html;
         try_files $uri $uri/ =404;
@@ -55,19 +61,9 @@ server {
         root /var/www/html;
         try_files $uri $uri/ =404;
 
-        # Check if session_token cookie exists and is valid
-        if ($allowed = 0) {
-            return 403;  # Forbidden if the token is not valid
-        }
-
-        # Additional token validation using Lua
-        access_by_lua_block {
-            local token_file = "/var/www/html/session_tokens/" .. ngx.var.cookie_session_token
-            local file = io.open(token_file, "r")
-            if not file then
-                ngx.exit(403)  # Forbidden if the token file doesn't exist
-            end
-            file:close()
+        # If the session token is invalid, return 403 Forbidden
+        if ($session_token_valid = 0) {
+            return 403;
         }
     }
 
@@ -82,6 +78,7 @@ server {
         proxy_pass http://localhost:8080/metrics;
     }
 }
+
 
 EOF
 

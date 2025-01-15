@@ -4,6 +4,7 @@
 if [ "$(id -u)" -ne 0 ]; then
     echo "Please run as root using sudo."
     exit 1
+fi
 
 # Prompt user for username and password for login
 echo "Enter a username for the login page:"

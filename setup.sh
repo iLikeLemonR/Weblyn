@@ -6,6 +6,17 @@ if [ "$(id -u)" -ne 0 ]; then
     exit 1
 fi
 
+# 5. Prompt user for username and password for login
+echo "Enter a username for the login page:"
+read USERNAME
+echo "Enter a password for the login page:"
+read -s PASSWORD
+
+# Save credentials to a .env file for later use (secure storage for simplicity)
+echo "USERNAME=$USERNAME" > /var/www/html/.env
+echo "PASSWORD=$(openssl passwd -crypt $PASSWORD)" >> /var/www/html/.env
+echo "saved user and pass!"
+
 # 1. Reinstall and fully set up NGINX
 echo "Reinstalling NGINX and ensuring correct setup..."
 sudo apt-get update
@@ -26,16 +37,16 @@ if [ ! -f "$NGINX_CONFIG" ]; then
     echo "Setting up NGINX configuration for remote access..."
 
     cat > $NGINX_CONFIG <<EOF
-map $cookie_session_token $allowed {
+map $cookie_session_token $session_token_valid {
     default 0;
-    ~^(.+)$ /var/www/html/session_tokens/$1;
+    ~^(.+)$ 1;
 }
 
 server {
     listen 80;
     server_name localhost;
 
-    # Location for login page
+    # Location for login page (login.html)
     location /login.html {
         root /var/www/html;
         try_files $uri $uri/ =404;
@@ -55,11 +66,11 @@ server {
         root /var/www/html;
         try_files $uri $uri/ =404;
 
-        # Check if session_token cookie exists and is valid
-        if ($allowed = 0) {
-            return 403;  # Forbidden if the token is not valid
+        # Check if session token is valid
+        if ($session_token_valid = 0) {
+            return 403;
         }
-
+        
         # Additional token validation using Lua
         access_by_lua_block {
             local token_file = "/var/www/html/session_tokens/" .. ngx.var.cookie_session_token
@@ -82,6 +93,7 @@ server {
         proxy_pass http://localhost:8080/metrics;
     }
 }
+
 
 EOF
 
@@ -113,16 +125,6 @@ else
     echo "NGINX failed to start. Please check the logs."
     exit 1
 fi
-
-# 5. Prompt user for username and password for login
-echo "Enter a username for the login page:"
-read USERNAME
-echo "Enter a password for the login page:"
-read -s PASSWORD
-
-# Save credentials to a .env file for later use (secure storage for simplicity)
-echo "USERNAME=$USERNAME" > /var/www/html/.env
-echo "PASSWORD=$(openssl passwd -crypt $PASSWORD)" >> /var/www/html/.env
 
 # 6. Pull the login.html and dashboard.html pages to the correct directory
 echo "Pulling login.html and dashboard.html..."

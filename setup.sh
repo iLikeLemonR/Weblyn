@@ -37,10 +37,11 @@ sudo chmod 600 /var/www/html/.env
 sudo chown -R www-data:www-data /var/www/html/
 
 # Pull the login.html, login.php, auth.php, and dashboard.html pages to the correct directory
-echo "Pulling login.html, login.php, auth.php, and dashboard.html..."
+echo "Pulling login.html, login.php, auth.php, statsPuller.go, and dashboard.html..."
 wget -q -O /var/www/html/login.html https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/login.html
 wget -q -O /var/www/html/login.php https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/login.php
 wget -q -O /var/www/html/auth.php https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/auth.php
+wget -q -O /var/www/html/statsPuller.go https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/statsPuller.go
 wget -q -O /var/www/html/dashboard.html https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/dashboard.html
 
 # Ensure the NGINX service exists and is running
@@ -95,6 +96,10 @@ server {
         fastcgi_pass unix:$PHP_FPM_SOCK; # Dynamically detected PHP-FPM socket
         fastcgi_param SCRIPT_FILENAME /var/www/html/auth.php;
         include fastcgi_params;
+    }
+
+    location /statsPuller.go {
+        proxy_pass http://localhost:8080/metrics;
     }
 
     location ~ \.php\$ {

@@ -6,6 +6,8 @@ if [ "$(id -u)" -ne 0 ]; then
     exit 1
 fi
 
+touch /var/www/html/.env
+
 # Prompt user for username and password for login
 echo "Enter a username for the login page:"
 read USERNAME

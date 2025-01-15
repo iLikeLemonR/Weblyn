@@ -21,6 +21,7 @@ echo "saved user and pass!"
 echo "Reinstalling NGINX and ensuring correct setup..."
 sudo apt-get update
 sudo apt-get install --reinstall -y nginx-full nginx-common
+sudo apt-get install php-fpm
 
 # 2. Ensure necessary NGINX directories exist
 echo "Ensuring necessary NGINX directories exist..."
@@ -55,7 +56,7 @@ server {
     # Location for the login script (login.php)
     location /login.php {
         root /var/www/html;
-        fastcgi_pass unix:/var/run/php/php7.4-fpm.sock;  # Adjust PHP-FPM version if needed
+        fastcgi_pass unix:/var/run/php/php-fpm.sock;  # Use the default PHP-FPM socket
         fastcgi_index login.php;
         fastcgi_param SCRIPT_FILENAME /var/www/html$fastcgi_script_name;
         include fastcgi_params;
@@ -101,6 +102,7 @@ server {
         proxy_pass http://localhost:8080/metrics;
     }
 }
+
 
 
 

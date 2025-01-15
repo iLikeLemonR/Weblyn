@@ -9,7 +9,7 @@ if [ "$(id -u)" -ne 0 ]; then
 echo "Enter a username for the login page:"
 read USERNAME
 echo "Enter a password for the login page:"
-read -s PASSWORD
+read PASSWORD
 
 # Save credentials to a .env file for later use (secure storage for simplicity)
 echo "USERNAME=$USERNAME" > /var/www/html/.env

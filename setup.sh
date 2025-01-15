@@ -59,21 +59,29 @@ LOCAL_IP=$(get_local_ip)
 # Update the index.html file dynamically with the local IP
 sed -i "s|http://localhost:8080/metrics|http://$LOCAL_IP:8080/metrics|g" /var/www/html/dashboard.html
 
-# Set up NGINX to serve login.html, login.php, and dashboard.html with authentication
-NGINX_CONFIG="/etc/nginx/sites-available/default"
-if [ ! -f "$NGINX_CONFIG" ]; then
-    echo "Setting up NGINX configuration for remote access..."
+# Detect installed PHP-FPM version
+PHP_FPM_SOCK=$(find /var/run/php/ -name "php*-fpm.sock" | head -n 1)
 
-    cat > $NGINX_CONFIG <<EOF
+if [ -z "$PHP_FPM_SOCK" ]; then
+    echo "PHP-FPM is not installed or running. Please install PHP-FPM and try again."
+    exit 1
+fi
+
+echo "Detected PHP-FPM socket: $PHP_FPM_SOCK"
+
+# Configure NGINX
+echo "Configuring NGINX..."
+NGINX_CONFIG="/etc/nginx/sites-available/default"
+cat > $NGINX_CONFIG <<EOF
 server {
     listen 80;
-    server_name yourdomain.com;
+    server_name localhost;
 
     root /var/www/html;
     index login.html;
 
     location / {
-        try_files $uri $uri/ =404;
+        try_files \$uri \$uri/ =404;
     }
 
     location /dashboard.html {
@@ -82,18 +90,16 @@ server {
 
     location /auth.php {
         internal;
-        fastcgi_pass unix:/var/run/php/php7.4-fpm.sock; # Adjust PHP version if needed
+        fastcgi_pass unix:$PHP_FPM_SOCK; # Dynamically detected PHP-FPM socket
         fastcgi_param SCRIPT_FILENAME /var/www/html/auth.php;
         include fastcgi_params;
     }
 
-    location ~ \.php$ {
+    location ~ \.php\$ {
         include snippets/fastcgi-php.conf;
-        fastcgi_pass unix:/var/run/php/php7.4-fpm.sock; # Adjust PHP version if needed
+        fastcgi_pass unix:$PHP_FPM_SOCK; # Dynamically detected PHP-FPM socket
     }
 }
-
-
 EOF
 
 # Set up the main NGINX configuration

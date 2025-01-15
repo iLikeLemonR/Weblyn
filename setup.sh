@@ -32,9 +32,11 @@ mkdir -p /var/log/nginx
 mkdir -p /var/www/html/session_tokens
 chmod 700 /var/www/html/session_tokens
 
-# Pull the login.php and dashboard.html pages to the correct directory
-echo "Pulling login.php and dashboard.html..."
+# Pull the login.html, login.php, auth.php, and dashboard.html pages to the correct directory
+echo "Pulling login.html, login.php, auth.php, and dashboard.html..."
+wget -q -O /var/www/html/login.html https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/login.html
 wget -q -O /var/www/html/login.php https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/login.php
+wget -q -O /var/www/html/auth.php https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/auth.php
 wget -q -O /var/www/html/dashboard.html https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/dashboard.html
 
 # Ensure the NGINX service exists and is running
@@ -55,7 +57,7 @@ LOCAL_IP=$(get_local_ip)
 # Update the index.html file dynamically with the local IP
 sed -i "s|http://localhost:8080/metrics|http://$LOCAL_IP:8080/metrics|g" /var/www/html/dashboard.html
 
-# Set up NGINX to serve login.php and dashboard.html with authentication
+# Set up NGINX to serve login.html, login.php, and dashboard.html with authentication
 NGINX_CONFIG="/etc/nginx/sites-available/remoteaccess"
 if [ ! -f "$NGINX_CONFIG" ]; then
     echo "Setting up NGINX configuration for remote access..."
@@ -66,11 +68,19 @@ server {
     server_name localhost;
 
     root /var/www/html;
-    index login.php;
+    index login.html;
 
-    # Serve login.php when accessing the root URL
+    # Serve login.html when accessing the root URL
     location = / {
-        try_files /login.php =404;
+        try_files /login.html =404;
+    }
+
+    # Serve PHP files
+    location ~ \.php\$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/var/run/php/php-fpm.sock;  # Adjust the path to your PHP-FPM socket file as needed
+        fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
+        include fastcgi_params;
     }
 
     # Authorization check for dashboard.html
@@ -94,14 +104,7 @@ server {
 
     # Error page for unauthorized access
     location @error401 {
-        return 302 /login.php;
-    }
-
-    location ~ \.php\$ {
-        include snippets/fastcgi-php.conf;
-        fastcgi_pass unix:/var/run/php/php-fpm.sock;  # Adjust the path to your PHP-FPM socket file as needed
-        fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
-        include fastcgi_params;
+        return 302 /login.html;
     }
 
     location ~ /\.ht {
@@ -164,7 +167,7 @@ session_start();
 \$session_token = \$_COOKIE['session_token'] ?? null;
 \$token_file = '/var/www/html/session_tokens/' . md5(\$session_token);
 
-if (\$session_token && file_exists(\$token_file)) {
+if (\$session_token && file_exists($token_file) && file_get_contents($token_file) === \$session_token) {
     echo 'Authorized';
 } else {
     header('HTTP/1.1 401 Unauthorized');

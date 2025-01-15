@@ -153,7 +153,7 @@ fi
 
 # 6. Pull the login.html and dashboard.html pages to the correct directory
 echo "Pulling login.html and dashboard.html..."
-wget -q -O /var/www/html/login.html https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/login.html
+wget -q -O /var/www/html/login.html https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/login.php
 wget -q -O /var/www/html/dashboard.html https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/dashboard.html
 
 # 7. Pull login.php from GitHub

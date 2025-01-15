@@ -23,11 +23,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if ($username == $valid_username && password_verify($password, $valid_password)) {
         // Generate a random, secure session token
         $session_token = bin2hex(random_bytes(32));  // Generate a secure random token
+        // Set a cookie with the session token, making it secure and HttpOnly
+        setcookie('session_token', $session_token, time() + 3600, '/', '', true, true);  // Secure cookie
         // Save the session token to a file or database securely (in a hidden, secure location)
         $token_file = '/var/www/html/session_tokens/' . md5($session_token);  // Use md5 to name the file
         file_put_contents($token_file, $session_token);
-        // Set a cookie with the session token, making it secure and HttpOnly
-        setcookie('session_token', $session_token, time() + 3600, '/', '', true, true);  // Secure cookie
         // Redirect the user to the dashboard
         header("Location: /dashboard.html");
         exit;

@@ -38,70 +38,87 @@ if [ ! -f "$NGINX_CONFIG" ]; then
     echo "Setting up NGINX configuration for remote access..."
 
     cat > $NGINX_CONFIG <<EOF
-map $cookie_session_token $session_token_valid {
-    default 0;
-    ~.+ 1;
+user www-data;
+worker_processes auto;
+pid /run/nginx.pid;
+
+events {
+    worker_connections 1024;
 }
 
-server {
-    listen 80;
-    server_name localhost;
+http {
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
 
-    # Location for login page
-    location /login.html {
-        root /var/www/html;
-        try_files $uri $uri/ =404;
+    sendfile on;
+    keepalive_timeout 65;
+    types_hash_max_size 2048;
+    server_names_hash_bucket_size 64;
+
+    include /etc/nginx/conf.d/*.conf;
+    include /etc/nginx/sites-enabled/*;
+
+    upstream php-handler {
+        server unix:/var/run/php/php7.4-fpm.sock;  # Adjust the path to your PHP-FPM socket file as needed
     }
 
-    # Location for the login script (login.php)
-    location /login.php {
-        root /var/www/html;
-        fastcgi_pass unix:/var/run/php/php-fpm.sock;  # Use the default PHP-FPM socket
-        fastcgi_index login.php;
-        fastcgi_param SCRIPT_FILENAME /var/www/html$fastcgi_script_name;
-        include fastcgi_params;
-    }
+    server {
+        listen 80;
+        server_name your_domain.com;  # Replace with your domain name or IP address
 
-    # Protect dashboard.html (only accessible after login via secure session token)
-    location /dashboard.html {
         root /var/www/html;
-        try_files $uri $uri/ =404;
+        index index.php index.html index.htm;
 
-        # Check if session_token cookie exists and is valid
-        if ($session_token_valid = 0) {
-            return 403;  # Forbidden if the token is not valid
+        location / {
+            # Redirect all requests to login.php if not logged in
+            set $session_token "";
+            if ($http_cookie ~* "session_token=([^;]+)(;|$)") {
+                set $session_token $1;
+            }
+            access_by_lua_block {
+                local session_token = ngx.var.cookie_session_token
+                local token_file = "/var/www/html/session_tokens/" .. ngx.md5(session_token)
+                local file = io.open(token_file, "r")
+                if not file then
+                    return ngx.redirect("/login.php", 302)
+                else
+                    file:close()
+                end
+            }
+
+            try_files $uri $uri/ =404;
         }
 
-        # Additional token validation using Lua
-        access_by_lua_block {
-            local session_token = ngx.var.cookie_session_token
-            local token_file = "/var/www/html/session_tokens/" .. ngx.md5(session_token)
-            local file = io.open(token_file, "r")
-            
-            if not file then
-                ngx.exit(403)  # Forbidden if the token file doesn't exist
-            end
-            
-            local stored_token = file:read("*a")
-            file:close()
-
-            if stored_token ~= session_token then
-                ngx.exit(403)  # Forbidden if the token does not match
-            end
+        location /login.php {
+            try_files $uri =404;
+            include snippets/fastcgi-php.conf;
+            fastcgi_pass php-handler;
+            fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+            include fastcgi_params;
         }
-    }
 
-    # Default location (root should serve login.html as the entry point)
-    location / {
-        root /var/www/html;
-        index login.html;
-    }
+        location ~ \.php$ {
+            try_files $uri =404;
+            include snippets/fastcgi-php.conf;
+            fastcgi_pass php-handler;
+            fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+            include fastcgi_params;
+        }
 
-    # Location for metrics, served from localhost:8080/metrics
-    location /metrics {
-        proxy_pass http://localhost:8080/metrics;
+        # Location for metrics, served from localhost:8080/metrics
+        location /metrics {
+            proxy_pass http://localhost:8080/metrics;
+        }
+        
+        location ~ /\.ht {
+            deny all;
+        }
+
+        error_log /var/log/nginx/error.log;
+        access_log /var/log/nginx/access.log;
     }
 }
+
 
 
 

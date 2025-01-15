@@ -100,7 +100,7 @@ server {
         include fastcgi_params;
     }
 
-    location /statsPuller.go {
+    location /metrics {
         proxy_pass http://localhost:8080/metrics;
     }
 

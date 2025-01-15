@@ -385,10 +385,12 @@
                 console.error('Error fetching metrics:', error);
             }
         }
+        setTimeout(function() {
+            window.onload = function() {
+                document.cookie = 'session_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+        }   ;
+        }, 1000);
         
-        window.onload = function() {
-            document.cookie = 'session_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-        };
 
         // Fetch metrics every 3 seconds
         setInterval(fetchMetrics, 3000);

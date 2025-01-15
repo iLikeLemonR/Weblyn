@@ -38,9 +38,7 @@ if [ ! -f "$NGINX_CONFIG" ]; then
     echo "Setting up NGINX configuration for remote access..."
 
     cat > $NGINX_CONFIG <<EOF
-/login.php {
-            try_files $uri =404;
-            includeuser www-data;
+user www-data;
 worker_processes auto;
 pid /run/nginx.pid;
 
@@ -119,6 +117,7 @@ http {
         access_log /var/log/nginx/access.log;
     }
 }
+
 
 EOF
 

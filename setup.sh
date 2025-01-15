@@ -182,6 +182,8 @@ http {
 }
 EOF
 
+sudo ln -s /etc/nginx/sites-available/remoteaccess /etc/nginx/sites-enabled/
+
 # 4. Ensure the NGINX service exists and is running
 echo "Ensuring NGINX service is set up and running..."
 if ! systemctl is-enabled --quiet nginx; then

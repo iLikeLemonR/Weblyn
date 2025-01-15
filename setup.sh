@@ -17,7 +17,7 @@ echo "USERNAME=$USERNAME" > /var/www/html/.env
 echo "PASSWORD=$(openssl passwd -1 $PASSWORD)" >> /var/www/html/.env
 echo "Saved user and pass!"
 
-# Reinstall and fully set up NGINX with Lua module
+# Reinstall and fully set up NGINX with PHP-FPM
 echo "Reinstalling NGINX and ensuring correct setup..."
 sudo apt-get update
 sudo apt-get install --reinstall -y nginx-full nginx-common nginx-extras
@@ -50,23 +50,23 @@ server {
     }
 
     location / {
-        # Redirect all requests to login.php if not logged in
-        set \$session_token "";
-        if (\$http_cookie ~* "session_token=([^;]+)(;|$)") {
-            set \$session_token \$1;
-        }
-        access_by_lua_block {
-            local session_token = ngx.var.cookie_session_token
-            local token_file = "/var/www/html/session_tokens/" .. ngx.md5(session_token)
-            local file = io.open(token_file, "r")
-            if not file then
-                return ngx.redirect("/login.php", 302)
-            else
-                file:close()
-            end
-        }
+        auth_request /auth.php;
+
+        error_page 401 = @error401;
 
         try_files \$uri \$uri/ =404;
+    }
+
+    location = /auth.php {
+        internal;
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass php-handler;
+        fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
+        include fastcgi_params;
+    }
+
+    location @error401 {
+        return 302 /login.php;
     }
 
     location /login.php {
@@ -128,61 +128,6 @@ http {
     upstream php-handler {
         server unix:/var/run/php/php7.4-fpm.sock;  # Adjust the path to your PHP-FPM socket file as needed
     }
-
-    server {
-        listen 80;
-        server_name your_domain.com;  # Replace with your domain name or IP address
-
-        root /var/www/html;
-        index index.php index.html index.htm;
-
-        location /metrics {
-            proxy_pass http://localhost:8080/metrics;
-        }
-
-        location / {
-            # Redirect all requests to login.php if not logged in
-            set \$session_token "";
-            if (\$http_cookie ~* "session_token=([^;]+)(;|$)") {
-                set \$session_token \$1;
-            }
-            access_by_lua_block {
-                local session_token = ngx.var.cookie_session_token
-                local token_file = "/var/www/html/session_tokens/" .. ngx.md5(session_token)
-                local file = io.open(token_file, "r")
-                if not file then
-                    return ngx.redirect("/login.php", 302)
-                else
-                    file:close()
-                end
-            }
-
-            try_files \$uri \$uri/ =404;
-        }
-
-        location /login.php {
-            try_files \$uri =404;
-            include snippets/fastcgi-php.conf;
-            fastcgi_pass php-handler;
-            fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
-            include fastcgi_params;
-        }
-
-        location ~ \.php$ {
-            try_files \$uri =404;
-            include snippets/fastcgi-php.conf;
-            fastcgi_pass php-handler;
-            fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
-            include fastcgi_params;
-        }
-
-        location ~ /\.ht {
-            deny all;
-        }
-
-        error_log /var/log/nginx/error.log;
-        access_log /var/log/nginx/access.log;
-    }
 }
 EOF
 
@@ -199,4 +144,42 @@ get_local_ip() {
 }
 
 # Get the local IP
-LOCAL_IP=$(get_local_ip
+LOCAL_IP=$(get_local_ip)
+
+# Update the index.html file dynamically with the local IP
+sed -i "s|http://localhost:8080/metrics|http://$LOCAL_IP:8080/metrics|g" /var/www/html/dashboard.html
+
+# Restart and enable NGINX service
+systemctl restart nginx
+
+# Check if NGINX is running
+if systemctl is-active --quiet nginx; then
+    echo "NGINX is running."
+else
+    echo "NGINX failed to start. Please check the logs."
+    exit 1
+fi
+
+# Pull the login.php and dashboard.html pages to the correct directory
+echo "Pulling login.php and dashboard.html..."
+wget -q -O /var/www/html/login.php https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/login.php
+wget -q -O /var/www/html/dashboard.html https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/dashboard.html
+
+# Create the auth.php file for authorization
+cat > /var/www/html/auth.php <<EOF
+<?php
+session_start();
+
+\$session_token = \$_COOKIE['session_token'] ?? null;
+\$token_file = '/var/www/html/session_tokens/' . md5(\$session_token);
+
+if (!\$session_token || !file_exists(\$token_file)) {
+    header('HTTP/1.1 401 Unauthorized');
+    exit;
+}
+?>
+EOF
+
+# Install required packages (PHP, MySQLi extension, etc.)
+echo "Installing PHP, MySQLi, and related packages..."
+sudo apt-get

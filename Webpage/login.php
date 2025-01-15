@@ -24,7 +24,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
     // Check if the credentials are correct
     if ($username == $valid_username && password_verify($password, $valid_password)) {
-        
         // Generate a random, secure session token
         $session_token = bin2hex(random_bytes(32));  // Generate a secure random token
 

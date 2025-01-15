@@ -149,4 +149,3 @@ else
     echo "NGINX failed to start. Please check the logs."
     exit 1
 fi
-fi

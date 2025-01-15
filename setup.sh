@@ -14,7 +14,7 @@ read PASSWORD
 
 # Save credentials to a .env file for later use (secure storage for simplicity)
 echo "USERNAME=$USERNAME" > /var/www/html/.env
-echo "PASSWORD=$(openssl passwd -1 $PASSWORD)" >> /var/www/html/.env
+echo "PASSWORD=$(openssl passwd -6 $PASSWORD)" >> /var/www/html/.env
 echo "Saved user and pass!"
 
 # Reinstall and fully set up NGINX with PHP-FPM
@@ -30,7 +30,9 @@ mkdir -p /etc/nginx/sites-available
 mkdir -p /etc/nginx/sites-enabled
 mkdir -p /var/log/nginx
 mkdir -p /var/www/html/session_tokens
-chmod 700 /var/www/html/session_tokens
+sudo chmod 700 /var/www/html/session_tokens
+sudo chmod 600 /var/www/html/.env
+sudo chown -R www-data:www-data /var/www/html/
 
 # Pull the login.html, login.php, auth.php, and dashboard.html pages to the correct directory
 echo "Pulling login.html, login.php, auth.php, and dashboard.html..."
@@ -58,62 +60,39 @@ LOCAL_IP=$(get_local_ip)
 sed -i "s|http://localhost:8080/metrics|http://$LOCAL_IP:8080/metrics|g" /var/www/html/dashboard.html
 
 # Set up NGINX to serve login.html, login.php, and dashboard.html with authentication
-NGINX_CONFIG="/etc/nginx/sites-available/remoteaccess"
+NGINX_CONFIG="/etc/nginx/sites-available/default"
 if [ ! -f "$NGINX_CONFIG" ]; then
     echo "Setting up NGINX configuration for remote access..."
 
     cat > $NGINX_CONFIG <<EOF
 server {
     listen 80;
-    server_name localhost;
+    server_name yourdomain.com;
 
     root /var/www/html;
     index login.html;
 
-    # Serve login.html when accessing the root URL
-    location = / {
-        try_files /login.html =404;
+    location / {
+        try_files $uri $uri/ =404;
     }
 
-    # Serve PHP files
-    location ~ \.php\$ {
-        include snippets/fastcgi-php.conf;
-        fastcgi_pass unix:/var/run/php/php-fpm.sock;  # Adjust the path to your PHP-FPM socket file as needed
-        fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
-        include fastcgi_params;
-    }
-
-    # Authorization check for dashboard.html
     location /dashboard.html {
-        auth_request /auth.php;
-        
-        error_page 401 = @error401;
-
-        # If authorized, serve the dashboard.html file
-        try_files \$uri =404;
+        auth_request /auth.php; # Calls auth.php to check authorization
     }
 
-    # Internal location for auth.php
-    location = /auth.php {
+    location /auth.php {
         internal;
-        include snippets/fastcgi-php.conf;
-        fastcgi_pass unix:/var/run/php/php-fpm.sock;  # Adjust the path to your PHP-FPM socket file as needed
-        fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
+        fastcgi_pass unix:/var/run/php/php7.4-fpm.sock; # Adjust PHP version if needed
+        fastcgi_param SCRIPT_FILENAME /var/www/html/auth.php;
         include fastcgi_params;
     }
 
-    # Error page for unauthorized access
-    location @error401 {
-        return 302 /login.html;
+    location ~ \.php$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/var/run/php/php7.4-fpm.sock; # Adjust PHP version if needed
     }
-
-    location ~ /\.ht {
-        deny all;
-    }
-
-    error_log /var/log/nginx/error.log;
-    access_log /var/log/nginx/access.log;
 }
+
 
 EOF
 

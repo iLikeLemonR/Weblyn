@@ -2,7 +2,6 @@
 ob_start(); // Start output buffering
 
 session_start();
-
 // Read the credentials from the .env file
 $env_file = '/var/www/html/.env';
 if (file_exists($env_file)) {
@@ -29,8 +28,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         // Generate a random, secure session token
         $session_token = bin2hex(random_bytes(32));  // Generate a secure random token
         
-        // Set a cookie with the session token, making it secure and HttpOnly
-        setcookie('session_token', $session_token, time() + 3600, '/', '', isset($_SERVER['HTTPS']), true);  // Secure cookie
+        // Set a cookie with the session token, making it secure
+        setcookie('session_token', $session_token, time() + 1, '/', '', isset($_SERVER['HTTPS']), true);  // Secure cookie
         
         // Save the session token to a file or database securely
         $token_file = '/var/www/html/session_tokens/' . md5($session_token);  // Use md5 to name the file

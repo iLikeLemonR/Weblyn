@@ -144,7 +144,83 @@ http {
 
 EOF
 
-# Restart and enable NGINX service
+# Install Go if not installed
+if ! command -v go &> /dev/null; then
+    echo "Go not found. Installing Go..."
+
+    # Download the latest Go tarball
+    GO_VERSION=$(curl -s https://golang.org/dl/ | grep -oP 'go\d+\.\d+\.\d+.*\.tar\.gz' | head -n 1)
+    GO_TAR_URL="https://golang.org/dl/$GO_VERSION"
+    wget $GO_TAR_URL -P /tmp
+
+    # Extract the tarball and install
+    tar -C /usr/local -xzf /tmp/$GO_VERSION
+
+    # Clean up the tarball
+    rm -f /tmp/$GO_VERSION
+
+    echo "Go has been installed."
+else
+    echo "Go is already installed."
+fi
+
+# Set up Go environment variables
+if ! grep -q "export PATH=\$PATH:/usr/local/go/bin" ~/.bashrc; then
+    echo "export PATH=\$PATH:/usr/local/go/bin" >> ~/.bashrc
+    echo "export GOPATH=\$HOME/go" >> ~/.bashrc
+    source ~/.bashrc
+    echo "Go environment variables have been set."
+else
+    echo "Go environment variables already set."
+fi
+
+# Initialize Go module in /var/www/html
+echo "Initializing Go module in /var/www/html..."
+cd /var/www/html
+go mod init /var/www/html
+
+# Install Go libraries
+echo "Installing Go libraries..."
+
+# Ensure Go workspace exists
+mkdir -p "$HOME/go"
+
+# Install necessary libraries using go get
+go get github.com/shirou/gopsutil/cpu
+go get github.com/shirou/gopsutil/mem
+go get github.com/shirou/gopsutil/disk
+
+echo "Go libraries have been installed."
+
+# Create the systemd service for statsPuller
+echo "Creating systemd service for statsPuller..."
+
+cat > /etc/systemd/system/statsPuller.service <<EOF
+[Unit]
+Description=Stats Puller Go Service
+After=network.target
+
+[Service]
+ExecStart=/usr/local/go/bin/go run /var/www/html/statsPuller.go
+WorkingDirectory=/var/www/html
+User=www-data
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Reload systemd to apply the new service
+systemctl daemon-reload
+
+# Enable and start the statsPuller service
+echo "Enabling and starting the statsPuller service..."
+systemctl enable statsPuller.service
+systemctl start statsPuller.service
+
+echo "statsPuller service has been set up and is running."
+
+# Restart NGINX service to make sure everything works
 systemctl restart nginx
 
 # Check if NGINX is running

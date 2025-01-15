@@ -37,9 +37,9 @@ if [ ! -f "$NGINX_CONFIG" ]; then
     echo "Setting up NGINX configuration for remote access..."
 
     cat > $NGINX_CONFIG <<EOF
-map $cookie_session_token $allowed {
+map $cookie_session_token $session_token_valid {
     default 0;
-    ~^(.+)$ 1;
+    ~.+ 1;
 }
 
 server {
@@ -67,7 +67,7 @@ server {
         try_files $uri $uri/ =404;
 
         # Check if session_token cookie exists and is valid
-        if ($allowed = 0) {
+        if ($session_token_valid = 0) {
             return 403;  # Forbidden if the token is not valid
         }
 
@@ -101,6 +101,7 @@ server {
         proxy_pass http://localhost:8080/metrics;
     }
 }
+
 
 
 

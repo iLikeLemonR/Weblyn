@@ -152,13 +152,9 @@ else
 fi
 
 # 6. Pull the login.html and dashboard.html pages to the correct directory
-echo "Pulling login.html and dashboard.html..."
+echo "Pulling login.php and dashboard.html..."
 wget -q -O /var/www/html/login.html https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/login.php
 wget -q -O /var/www/html/dashboard.html https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/dashboard.html
-
-# 7. Pull login.php from GitHub
-echo "Pulling login.php from GitHub..."
-wget -q -O /var/www/html/login.php https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/login.php
 
     # Enable the site and restart NGINX
     ln -s /etc/nginx/sites-available/remoteaccess /etc/nginx/sites-enabled/

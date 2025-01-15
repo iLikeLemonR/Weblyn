@@ -180,8 +180,8 @@ fi
 echo "Initializing Go module in /var/www/html..."
 export PATH=$PATH:/usr/local/go/bin
 export GOPATH=$HOME/go
-cd /var/www/html
-go mod init
+cd /var/www/
+go mod init html/
 
 # Install Go libraries
 echo "Installing Go libraries..."

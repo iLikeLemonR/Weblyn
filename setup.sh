@@ -159,6 +159,27 @@ http {
 
 EOF
 
+<<<<<<< HEAD
+=======
+# Create the auth.php file for authorization
+cat > /var/www/html/auth.php <<EOF
+<?php
+session_start();
+
+\$session_token = \$_COOKIE['session_token'] ?? null;
+\$token_file = '/var/www/html/session_tokens/' . md5(\$session_token);
+
+if (\$session_token && file_exists($token_file) && file_get_contents($token_file) === \$session_token) {
+    echo 'Authorized';
+} else {
+    header('HTTP/1.1 401 Unauthorized');
+    exit;
+}
+?>
+
+EOF
+
+>>>>>>> 70b76e72b4b7f8ad5276b4dbaf5c305c8ea5ba53
 # Restart and enable NGINX service
 systemctl restart nginx
 

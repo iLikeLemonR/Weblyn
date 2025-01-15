@@ -2,11 +2,11 @@
 
 # Ensure the script runs with sudo privileges
 if [ "$(id -u)" -ne 0 ]; then
-    echo "Please run as root."
+    echo "Please run as root using sudo."
     exit 1
 fi
 
-# 5. Prompt user for username and password for login
+# Prompt user for username and password for login
 echo "Enter a username for the login page:"
 read USERNAME
 echo "Enter a password for the login page:"
@@ -14,15 +14,17 @@ read -s PASSWORD
 
 # Save credentials to a .env file for later use (secure storage for simplicity)
 echo "USERNAME=$USERNAME" > /var/www/html/.env
-echo "PASSWORD=$(openssl passwd -crypt $PASSWORD)" >> /var/www/html/.env
-echo "saved user and pass!"
+echo "PASSWORD=$(openssl passwd -1 $PASSWORD)" >> /var/www/html/.env
+echo "Saved user and pass!"
 
-# 1. Reinstall and fully set up NGINX
+# Reinstall and fully set up NGINX with PHP-FPM
 echo "Reinstalling NGINX and ensuring correct setup..."
 sudo apt-get update
-sudo apt-get install --reinstall -y nginx-full nginx-common
+sudo apt-get install --reinstall -y nginx-full nginx-common nginx-extras
+sudo apt install php libapache2-mod-php
+sudo apt install php7.4-fpm
 
-# 2. Ensure necessary NGINX directories exist
+# Ensure necessary NGINX directories exist
 echo "Ensuring necessary NGINX directories exist..."
 mkdir -p /var/www/html
 mkdir -p /etc/nginx/sites-available
@@ -31,73 +33,12 @@ mkdir -p /var/log/nginx
 mkdir -p /var/www/html/session_tokens
 chmod 700 /var/www/html/session_tokens
 
-# 3. Set up NGINX to serve login.html and dashboard.html with authentication
-NGINX_CONFIG="/etc/nginx/sites-available/remoteaccess"
-if [ ! -f "$NGINX_CONFIG" ]; then
-    echo "Setting up NGINX configuration for remote access..."
+# Pull the login.php and dashboard.html pages to the correct directory
+echo "Pulling login.php and dashboard.html..."
+sudo wget -q -O /var/www/html/login.php https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/login.php
+sudo wget -q -O /var/www/html/dashboard.html https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/dashboard.html
 
-    cat > $NGINX_CONFIG <<EOF
-map $cookie_session_token $session_token_valid {
-    default 0;
-    ~^(.+)$ 1;
-}
-
-server {
-    listen 80;
-    server_name localhost;
-
-    # Location for login page (login.html)
-    location /login.html {
-        root /var/www/html;
-        try_files $uri $uri/ =404;
-    }
-
-    # Location for the login script (login.php)
-    location /login.php {
-        root /var/www/html;
-        fastcgi_pass unix:/var/run/php/php7.4-fpm.sock;  # Adjust PHP-FPM version if needed
-        fastcgi_index login.php;
-        fastcgi_param SCRIPT_FILENAME /var/www/html$fastcgi_script_name;
-        include fastcgi_params;
-    }
-
-    # Protect dashboard.html (only accessible after login via secure session token)
-    location /dashboard.html {
-        root /var/www/html;
-        try_files $uri $uri/ =404;
-
-        # Check if session token is valid
-        if ($session_token_valid = 0) {
-            return 403;
-        }
-        
-        # Additional token validation using Lua
-        access_by_lua_block {
-            local token_file = "/var/www/html/session_tokens/" .. ngx.var.cookie_session_token
-            local file = io.open(token_file, "r")
-            if not file then
-                ngx.exit(403)  # Forbidden if the token file doesn't exist
-            end
-            file:close()
-        }
-    }
-
-    # Default location (root should serve login.html as the entry point)
-    location / {
-        root /var/www/html;
-        index login.html;
-    }
-
-    # Location for metrics, served from localhost:8080/metrics
-    location /metrics {
-        proxy_pass http://localhost:8080/metrics;
-    }
-}
-
-
-EOF
-
-# 4. Ensure the NGINX service exists and is running
+# Ensure the NGINX service exists and is running
 echo "Ensuring NGINX service is set up and running..."
 if ! systemctl is-enabled --quiet nginx; then
     echo "NGINX service does not exist. Creating and enabling the service..."
@@ -115,6 +56,127 @@ LOCAL_IP=$(get_local_ip)
 # Update the index.html file dynamically with the local IP
 sed -i "s|http://localhost:8080/metrics|http://$LOCAL_IP:8080/metrics|g" /var/www/html/dashboard.html
 
+# Set up NGINX to serve login.php and dashboard.html with authentication
+NGINX_CONFIG="/etc/nginx/sites-available/remoteaccess"
+if [ ! -f "$NGINX_CONFIG" ]; then
+    echo "Setting up NGINX configuration for remote access..."
+
+    cat > $NGINX_CONFIG <<EOF
+server {
+    listen 80;
+    server_name localhost;
+
+    root /var/www/html;
+    index login.php;
+
+    # Serve login.php when accessing the root URL
+    location = / {
+        try_files /login.php =404;
+    }
+
+    # Authorization check for dashboard.html
+    location /dashboard.html {
+        auth_request /auth.php;
+        
+        error_page 401 = @error401;
+
+        # If authorized, serve the dashboard.html file
+        try_files $uri =404;
+    }
+
+    # Internal location for auth.php
+    location = /auth.php {
+        internal;
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/var/run/php/php7.4-fpm.sock;  # Adjust the path to your PHP-FPM socket file as needed
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        include fastcgi_params;
+    }
+
+    # Error page for unauthorized access
+    location @error401 {
+        return 302 /login.php;
+    }
+
+    location ~ \.php$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/var/run/php/php7.4-fpm.sock;  # Adjust the path to your PHP-FPM socket file as needed
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        include fastcgi_params;
+    }
+
+    location ~ /\.ht {
+        deny all;
+    }
+
+    error_log /var/log/nginx/error.log;
+    access_log /var/log/nginx/access.log;
+}
+
+
+EOF
+
+# Set up the main NGINX configuration
+MAIN_NGINX_CONFIG="/etc/nginx/nginx.conf"
+cat > $MAIN_NGINX_CONFIG <<EOF
+user www-data;
+worker_processes auto;
+pid /run/nginx.pid;
+
+events {
+    worker_connections 1024;
+}
+
+http {
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+
+    sendfile on;
+    tcp_nopush on;
+    tcp_nodelay on;
+    keepalive_timeout 65;
+    types_hash_max_size 2048;
+    server_names_hash_bucket_size 64;
+
+    include /etc/nginx/conf.d/*.conf;
+    include /etc/nginx/sites-enabled/*;
+
+    gzip on;
+    gzip_disable "msie6";
+
+    gzip_vary on;
+    gzip_proxied any;
+    gzip_comp_level 6;
+    gzip_buffers 16 8k;
+    gzip_http_version 1.1;
+    gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript;
+
+    upstream php-handler {
+        server unix:/var/run/php/php7.4-fpm.sock;  # Adjust this path to your PHP-FPM socket file
+    }
+}
+
+EOF
+
+# Create the auth.php file for authorization
+cat > /var/www/html/auth.php <<EOF
+<?php
+// auth.php
+session_start();
+
+$session_token = $_COOKIE['session_token'] ?? null;
+$token_file = '/var/www/html/session_tokens/' . md5($session_token);
+
+if ($session_token && file_exists($token_file)) {
+    echo 'Authorized';
+} else {
+    header('HTTP/1.1 401 Unauthorized');
+    exit;
+}
+?>
+
+EOF
+
 # Restart and enable NGINX service
 systemctl restart nginx
 
@@ -125,29 +187,3 @@ else
     echo "NGINX failed to start. Please check the logs."
     exit 1
 fi
-
-# 6. Pull the login.html and dashboard.html pages to the correct directory
-echo "Pulling login.html and dashboard.html..."
-wget -q -O /var/www/html/login.html https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/login.html
-wget -q -O /var/www/html/dashboard.html https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/dashboard.html
-
-# 7. Pull login.php from GitHub
-echo "Pulling login.php from GitHub..."
-wget -q -O /var/www/html/login.php https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/login.php
-
-    # Enable the site and restart NGINX
-    ln -s /etc/nginx/sites-available/remoteaccess /etc/nginx/sites-enabled/
-    systemctl restart nginx
-else
-    echo "NGINX configuration for remoteaccess already exists."
-fi
-
-# 8. Install required packages (PHP, MySQLi extension, etc.)
-echo "Installing PHP, MySQLi, and related packages..."
-sudo apt-get install -y php-fpm php-mysqli
-
-# 9. Final message
-echo "Setup completed successfully."
-echo "NGINX is configured to serve login.html and dashboard.html with authentication."
-echo "The login system is set up with hardcoded credentials (for now)."
-echo "You can visit the site at http://localhost, and the dashboard will be accessible after logging in."

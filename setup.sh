@@ -103,6 +103,7 @@ server {
 }
 
 
+
 EOF
 
 # 4. Ensure the NGINX service exists and is running

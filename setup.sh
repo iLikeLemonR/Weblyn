@@ -38,6 +38,69 @@ if [ ! -f "$NGINX_CONFIG" ]; then
     echo "Setting up NGINX configuration for remote access..."
 
     cat > $NGINX_CONFIG <<EOF
+server {
+    listen 80;
+    server_name localhost;  # Replace with your domain name or IP address
+
+    root /var/www/html;
+    index index.php index.html index.htm;
+
+    location /metrics {
+        proxy_pass http://localhost:8080/metrics;
+    }
+
+    location / {
+        # Redirect all requests to login.php if not logged in
+        set $session_token "";
+        if ($http_cookie ~* "session_token=([^;]+)(;|$)") {
+            set $session_token $1;
+        }
+        access_by_lua_block {
+            local session_token = ngx.var.cookie_session_token
+            local token_file = "/var/www/html/session_tokens/" .. ngx.md5(session_token)
+            local file = io.open(token_file, "r")
+            if not file then
+                return ngx.redirect("/login.php", 302)
+            else
+                file:close()
+            end
+        }
+
+        try_files $uri $uri/ =404;
+    }
+
+    location /login.php {
+        try_files $uri =404;
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass php-handler;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        include fastcgi_params;
+    }
+
+    location ~ \.php$ {
+        try_files $uri =404;
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass php-handler;
+        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        include fastcgi_params;
+    }
+
+    location ~ /\.ht {
+        deny all;
+    }
+
+    error_log /var/log/nginx/error.log;
+    access_log /var/log/nginx/access.log;
+}
+
+EOF
+
+# 3. Set up NGINX to serve login.html and dashboard.html with authentication
+NGINX_CONFIG="/etc/nginx/nginx.conf"
+if [ ! -f "$NGINX_CONFIG" ]; then
+    echo "Setting up NGINX configuration for remote access..."
+
+    cat > $NGINX_CONFIG <<EOF
 user www-data;
 worker_processes auto;
 pid /run/nginx.pid;
@@ -117,8 +180,6 @@ http {
         access_log /var/log/nginx/access.log;
     }
 }
-
-
 EOF
 
 # 4. Ensure the NGINX service exists and is running

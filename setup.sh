@@ -38,7 +38,9 @@ if [ ! -f "$NGINX_CONFIG" ]; then
     echo "Setting up NGINX configuration for remote access..."
 
     cat > $NGINX_CONFIG <<EOF
-user www-data;
+/login.php {
+            try_files $uri =404;
+            includeuser www-data;
 worker_processes auto;
 pid /run/nginx.pid;
 
@@ -68,6 +70,10 @@ http {
 
         root /var/www/html;
         index index.php index.html index.htm;
+
+        location /metrics {
+            proxy_pass http://localhost:8080/metrics;
+        }
 
         location / {
             # Redirect all requests to login.php if not logged in
@@ -105,11 +111,6 @@ http {
             include fastcgi_params;
         }
 
-        # Location for metrics, served from localhost:8080/metrics
-        location /metrics {
-            proxy_pass http://localhost:8080/metrics;
-        }
-        
         location ~ /\.ht {
             deny all;
         }
@@ -118,11 +119,6 @@ http {
         access_log /var/log/nginx/access.log;
     }
 }
-
-
-
-
-
 
 EOF
 

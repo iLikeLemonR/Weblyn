@@ -179,6 +179,8 @@ fi
 # Initialize Go module in /var/www/html
 echo "Initializing Go module in /var/www/html..."
 cd /var/www/html
+export PATH=$PATH:/usr/local/go/bin
+export GOPATH=$HOME/go
 go mod init /var/www/html
 
 # Install Go libraries

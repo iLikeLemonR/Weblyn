@@ -6,6 +6,8 @@ if [ "$(id -u)" -ne 0 ]; then
     exit 1
 fi
 
+CURRENT_USER=${SUDO_USER:-$(whoami)}
+
 touch /var/www/html/.env
 
 # Prompt user for username and password for login
@@ -149,15 +151,15 @@ if ! command -v go &> /dev/null; then
     echo "Go not found. Installing Go..."
 
     # Download the latest Go tarball
-    GO_VERSION=$(curl -s https://golang.org/dl/ | grep -oP 'go\d+\.\d+\.\d+.*\.tar\.gz' | head -n 1)
-    GO_TAR_URL="https://golang.org/dl/$GO_VERSION"
-    wget $GO_TAR_URL -P /tmp
+    GO_VERSION=$(curl -s https://go.dev/dl/ | grep -oP 'go\d+\.\d+\.\d+.*\.tar\.gz' | head -n 1)
+    GO_TAR_URL="https://go.dev/dl/$GO_VERSION"
+    wget $GO_TAR_URL -P /home/$CURRENT_USER/Downloads
 
     # Extract the tarball and install
-    tar -C /usr/local -xzf /tmp/$GO_VERSION
+    tar -C /usr/local -xzf /home/$CURRENT_USER/Downloads/$GO_VERSION
 
     # Clean up the tarball
-    rm -f /tmp/$GO_VERSION
+    rm -f /home/$CURRENT_USER/Downloads/$GO_VERSION
 
     echo "Go has been installed."
 else

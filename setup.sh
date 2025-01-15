@@ -15,7 +15,7 @@ read -s PASSWORD
 # Save credentials to a .env file for later use (secure storage for simplicity)
 echo "USERNAME=$USERNAME" > /var/www/html/.env
 echo "PASSWORD=$(openssl passwd -crypt $PASSWORD)" >> /var/www/html/.env
-echo "Username and Password have been saved!"
+echo "saved user and pass!"
 
 # 1. Reinstall and fully set up NGINX
 echo "Reinstalling NGINX and ensuring correct setup..."
@@ -37,15 +37,9 @@ if [ ! -f "$NGINX_CONFIG" ]; then
     echo "Setting up NGINX configuration for remote access..."
 
     cat > $NGINX_CONFIG <<EOF
-map $cookie_session_token $allowed {
-    default 0;
-    ~^(.+)$ /var/www/html/session_tokens/$1;
-}
-
-# Map the session token to a valid state (0 for invalid, 1 for valid)
 map $cookie_session_token $session_token_valid {
-    default 0;  # Default to invalid
-    ~^(.+)$ /var/www/html/session_tokens/$1;  # Check if session token file exists
+    default 0;
+    ~^(.+)$ 1;
 }
 
 server {
@@ -72,9 +66,19 @@ server {
         root /var/www/html;
         try_files $uri $uri/ =404;
 
-        # If the session token is invalid, return 403 Forbidden
+        # Check if session token is valid
         if ($session_token_valid = 0) {
             return 403;
+        }
+        
+        # Additional token validation using Lua
+        access_by_lua_block {
+            local token_file = "/var/www/html/session_tokens/" .. ngx.var.cookie_session_token
+            local file = io.open(token_file, "r")
+            if not file then
+                ngx.exit(403)  # Forbidden if the token file doesn't exist
+            end
+            file:close()
         }
     }
 

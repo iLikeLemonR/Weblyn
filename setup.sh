@@ -181,7 +181,7 @@ echo "Initializing Go module in /var/www/html..."
 export PATH=$PATH:/usr/local/go/bin
 export GOPATH=$HOME/go
 cd /var/www/
-go mod init html/
+go mod init statsPuller.com/statsPuller
 
 # Install Go libraries
 echo "Installing Go libraries..."

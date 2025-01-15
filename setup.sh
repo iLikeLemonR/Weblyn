@@ -14,7 +14,7 @@ read -s PASSWORD
 
 # Save credentials to a .env file for later use (secure storage for simplicity)
 echo "USERNAME=$USERNAME" > /var/www/html/.env
-echo "PASSWORD=$(openssl passwd -crypt $PASSWORD)" >> /var/www/html/.env
+echo "PASSWORD=$(openssl passwd -1 $PASSWORD)" >> /var/www/html/.env
 echo "saved user and pass!"
 
 # 1. Reinstall and fully set up NGINX

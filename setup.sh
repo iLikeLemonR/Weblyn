@@ -19,10 +19,9 @@ echo "Saved user and pass!"
 
 # Reinstall and fully set up NGINX with PHP-FPM
 echo "Reinstalling NGINX and ensuring correct setup..."
-sudo apt-get update
-sudo apt-get install --reinstall -y nginx-full nginx-common nginx-extras
-sudo apt install php libapache2-mod-php
-sudo apt install php7.4-fpm
+apt-get update
+apt-get install --reinstall -y nginx-full nginx-common nginx-extras
+apt-get install -y php-fpm
 
 # Ensure necessary NGINX directories exist
 echo "Ensuring necessary NGINX directories exist..."
@@ -35,8 +34,8 @@ chmod 700 /var/www/html/session_tokens
 
 # Pull the login.php and dashboard.html pages to the correct directory
 echo "Pulling login.php and dashboard.html..."
-sudo wget -q -O /var/www/html/login.php https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/login.php
-sudo wget -q -O /var/www/html/dashboard.html https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/dashboard.html
+wget -q -O /var/www/html/login.php https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/login.php
+wget -q -O /var/www/html/dashboard.html https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/dashboard.html
 
 # Ensure the NGINX service exists and is running
 echo "Ensuring NGINX service is set up and running..."
@@ -81,15 +80,15 @@ server {
         error_page 401 = @error401;
 
         # If authorized, serve the dashboard.html file
-        try_files $uri =404;
+        try_files \$uri =404;
     }
 
     # Internal location for auth.php
     location = /auth.php {
         internal;
         include snippets/fastcgi-php.conf;
-        fastcgi_pass unix:/var/run/php/php7.4-fpm.sock;  # Adjust the path to your PHP-FPM socket file as needed
-        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_pass unix:/var/run/php/php-fpm.sock;  # Adjust the path to your PHP-FPM socket file as needed
+        fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
         include fastcgi_params;
     }
 
@@ -98,10 +97,10 @@ server {
         return 302 /login.php;
     }
 
-    location ~ \.php$ {
+    location ~ \.php\$ {
         include snippets/fastcgi-php.conf;
-        fastcgi_pass unix:/var/run/php/php7.4-fpm.sock;  # Adjust the path to your PHP-FPM socket file as needed
-        fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_pass unix:/var/run/php/php-fpm.sock;  # Adjust the path to your PHP-FPM socket file as needed
+        fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
         include fastcgi_params;
     }
 
@@ -112,7 +111,6 @@ server {
     error_log /var/log/nginx/error.log;
     access_log /var/log/nginx/access.log;
 }
-
 
 EOF
 
@@ -152,7 +150,7 @@ http {
     gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript;
 
     upstream php-handler {
-        server unix:/var/run/php/php7.4-fpm.sock;  # Adjust this path to your PHP-FPM socket file
+        server unix:/var/run/php/php-fpm.sock;  # Adjust this path to your PHP-FPM socket file
     }
 }
 
@@ -161,13 +159,12 @@ EOF
 # Create the auth.php file for authorization
 cat > /var/www/html/auth.php <<EOF
 <?php
-// auth.php
 session_start();
 
-$session_token = $_COOKIE['session_token'] ?? null;
-$token_file = '/var/www/html/session_tokens/' . md5($session_token);
+\$session_token = \$_COOKIE['session_token'] ?? null;
+\$token_file = '/var/www/html/session_tokens/' . md5(\$session_token);
 
-if ($session_token && file_exists($token_file)) {
+if (\$session_token && file_exists(\$token_file)) {
     echo 'Authorized';
 } else {
     header('HTTP/1.1 401 Unauthorized');

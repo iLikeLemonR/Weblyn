@@ -17,10 +17,10 @@ echo "USERNAME=$USERNAME" > /var/www/html/.env
 echo "PASSWORD=$(openssl passwd -1 $PASSWORD)" >> /var/www/html/.env
 echo "Saved user and pass!"
 
-# Reinstall and fully set up NGINX
+# Reinstall and fully set up NGINX with Lua module
 echo "Reinstalling NGINX and ensuring correct setup..."
 sudo apt-get update
-sudo apt-get install --reinstall -y nginx-full nginx-common
+sudo apt-get install --reinstall -y nginx-full nginx-common nginx-extras
 sudo apt-get install -y php-fpm
 
 # Ensure necessary NGINX directories exist
@@ -199,32 +199,4 @@ get_local_ip() {
 }
 
 # Get the local IP
-LOCAL_IP=$(get_local_ip)
-
-# Update the index.html file dynamically with the local IP
-sed -i "s|http://localhost:8080/metrics|http://$LOCAL_IP:8080/metrics|g" /var/www/html/dashboard.html
-
-# Restart and enable NGINX service
-systemctl restart nginx
-
-# Check if NGINX is running
-if systemctl is-active --quiet nginx; then
-    echo "NGINX is running."
-else
-    echo "NGINX failed to start. Please check the logs."
-    exit 1
-fi
-
-# Pull the login.php and dashboard.html pages to the correct directory
-echo "Pulling login.php and dashboard.html..."
-wget -q -O /var/www/html/login.php https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/login.php
-wget -q -O /var/www/html/dashboard.html https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/dashboard.html
-
-# Install required packages (PHP, MySQLi extension, etc.)
-echo "Installing PHP, MySQLi, and related packages..."
-sudo apt-get install -y php-fpm php-mysqli
-
-# Final message
-echo "Setup completed successfully."
-echo "NGINX is configured to serve login.php and dashboard.html with authentication."
-echo "You can visit the site at http://localhost, and the dashboard will be accessible after logging in."
+LOCAL_IP=$(get_local_ip

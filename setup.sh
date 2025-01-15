@@ -4,7 +4,6 @@
 if [ "$(id -u)" -ne 0 ]; then
     echo "Please run as root using sudo."
     exit 1
-fi
 
 # Prompt user for username and password for login
 echo "Enter a username for the login page:"
@@ -168,4 +167,3 @@ if systemctl is-active --quiet nginx; then
 else
     echo "NGINX failed to start. Please check the logs."
     exit 1
-fi

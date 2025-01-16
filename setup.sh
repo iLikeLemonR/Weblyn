@@ -40,13 +40,14 @@ sudo chmod 700 /var/www/html/session_tokens
 sudo chmod 600 /var/www/html/.env
 sudo chown -R www-data:www-data /var/www/html/
 
-# Pull the login.html, login.php, auth.php, and dashboard.html pages to the correct directory
+# Pull the login.html, login.php, auth.php, xtermServer.js, and dashboard.html pages to the correct directory
 echo "Pulling login.html, login.php, auth.php, statsPuller.go, and dashboard.html..."
 wget -q -O /var/www/html/login.html https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/login.html
 wget -q -O /var/www/html/login.php https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/login.php
 wget -q -O /var/www/html/auth.php https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/auth.php
 wget -q -O /var/www/html/statsPuller.go https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/statsPuller.go
 wget -q -O /var/www/html/dashboard.html https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/dashboard.html
+wget -q -O /var/www/html/xtermServer.js https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/xtermServer.js
 
 # Ensure the NGINX service exists and is running
 echo "Ensuring NGINX service is set up and running..."
@@ -65,6 +66,7 @@ LOCAL_IP=$(get_local_ip)
 
 # Update the index.html file dynamically with the local IP
 sed -i "s|http://localhost:8080/metrics|http://$LOCAL_IP:8080/metrics|g" /var/www/html/dashboard.html
+sed -i "s|ws://localhost:3000|ws://$LOCAL_IP:3000|g" /var/www/html/dashboard.html
 
 # Detect installed PHP-FPM version
 PHP_FPM_SOCK=$(find /var/run/php/ -name "php*-fpm.sock" | head -n 1)
@@ -183,7 +185,8 @@ fi
 # Initialize Go module in /var/www/html
 echo "Initializing Go module and xterm@xterm using npm in /var/www/html..."
 cd /var/www/html
-npm install @xterm/xterm
+npm init -y 
+npm install express xterm node-pty ws
 go mod init statsPuller.com/statsPuller
 
 # Install Go libraries
@@ -200,7 +203,7 @@ go get github.com/shirou/gopsutil/disk
 echo "Go libraries have been installed."
 
 # Create the systemd service for statsPuller
-echo "Creating systemd service for statsPuller..."
+echo "Creating systemd service for statsPuller.go..."
 
 cat > /etc/systemd/system/statsPuller.service <<EOF
 [Unit]
@@ -217,15 +220,40 @@ Restart=always
 WantedBy=multi-user.target
 EOF
 
+# Create the systemd service for xtermServer
+echo "Creating systemd service for xtermServer.js..."
+cat > /etc/systemd/system/xterm-server.service <<EOF
+[Unit]
+Description=Xterm Server
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/node /var/www/html/xtermServer.js
+WorkingDirectory=/var/www/html
+Restart=always
+User=www-data
+Group=www-data
+Environment=NODE_ENV=production
+ExecStartPre=/bin/mkdir -p /var/log/xterm
+ExecStartPre=/bin/chown -R www-data:www-data /var/www/html
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
 # Reload systemd to apply the new service
 systemctl daemon-reload
 
 # Enable and start the statsPuller service
-echo "Enabling and starting the statsPuller service..."
+echo "Enabling and starting the statsPuller service and the xtermServer service..."
 systemctl enable statsPuller.service
 systemctl start statsPuller.service
 
+sudo systemctl enable xterm-server.service
+sudo systemctl start xterm-server.service
+
 echo "statsPuller service has been set up and is running."
+echo "xtermServer service has been set up and is running."
 
 # Restart NGINX service to make sure everything works
 systemctl restart nginx

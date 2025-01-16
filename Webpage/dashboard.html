@@ -11,7 +11,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:ital,wght@0,100..700;1,100..700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="node_modules/@xterm/xterm/css/xterm.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@4.16.0/css/xterm.css">
     <style>
         body {
             font-family: "Roboto Mono", serif;
@@ -392,6 +392,11 @@
             align-items: center;
             gap: 10px;
         }
+
+        #terminal {
+            width: 80%;
+            height: 80%;
+        }
     </style>
     
 </head>
@@ -564,63 +569,62 @@
 
     <!-- Add Bootstrap JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xterm/3.14.5/xterm.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm@4.16.0/lib/xterm.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.7.0/lib/xterm-addon-fit.js"></script>
     <script>
         // <----------Start of XTerm code------------>
-        const body = document.body;
-        const themeDropdownItems = document.querySelectorAll('.dropdown-item[data-theme]');
-        var term = new Terminal({
-            cursorBlink: "block",
+        const terminal = new Terminal({
+            cursorBlink: true, // Enable cursor blinking
+            scrollback: 1000, // Keep 1000 lines in history
+            theme: {
+                background: '#1e1e1e',
+                foreground: '#dcdcdc',
+            },
         });
 
-        const ws = new WebSocket("ws://localhost:3000", "echo-protocol");
-        var curr_line = "";
-        var entries = [];
+        // Add the fit addon for dynamic resizing
+        const fitAddon = new FitAddon.FitAddon();
+        terminal.loadAddon(fitAddon);
 
-        term.open(document.getElementById('terminal'));
-        term.write('Terminal $ ')
-        term.on("key", function(key, ev) {
-            curr_line += key;
-            term.write(key);
-        });
+        // Open the terminal in the "terminal" div
+        terminal.open(document.getElementById('terminal'));
+        fitAddon.fit(); // Fit terminal to its container
 
-        term.prompt = () => {
-            if (curr_line) {
-                let data = { method: "command", command: curr_line };
-                ws.send(JSON.stringify(data));
-            }
+        // WebSocket connection to the backend server
+        const socket = new WebSocket(`ws://${location.hostname}:3000`);
+
+        let inputBuffer = ''; // To handle user input before sending
+
+        socket.onopen = () => {
+            terminal.write('Connected to the server.\r\n');
         };
-        term.prompt();
-        ws.onmessage = msg => {
-            term.write("/r/n" + JSON.parse(msg.data).data);
-            curr_line = "";
-        }
 
-        term.on("paste", function(data) {
-            curr_line += data;
-            term.write(data);
-        });
+        socket.onmessage = (event) => {
+            // Write the server's response to the terminal
+            terminal.write(event.data);
+        };
 
-        term.on("key", function(key, ev) {
-            // Enter button
-            if (ev.KeyCode === 13) {
-                if (curr_line) {
-                    entries.push(curr_line);
-                    term.write("\r\n");
-                    term.prompt();
-                }
-            } else if (ev.keyCode === 8) {
-                // Backspace button
-                if (curr_line) {
-                    curr_line = curr_line.slice(0, curr_line.length - 1);
-                    term.write("\b \b");
+        terminal.onData((data) => {
+            if (data === '\r') {
+                // Enter key pressed
+                terminal.write('\r\n'); // Move to a new line visually
+                socket.send(inputBuffer + '\n'); // Send the command to the server
+                inputBuffer = ''; // Clear the buffer
+            } else if (data === '\u007f') {
+                // Backspace key pressed
+                if (inputBuffer.length > 0) {
+                    inputBuffer = inputBuffer.slice(0, -1); // Remove the last character
+                    terminal.write('\b \b'); // Erase the character visually
                 }
             } else {
-                curr_line += key;
-                term.write(key);
+                // Any other key pressed
+                inputBuffer += data; // Add the character to the buffer
+                terminal.write(data); // Display it in the terminal
             }
         });
-        // <----------End of XTerm code------------>
+
+        window.addEventListener('resize', () => fitAddon.fit());
+        // <----------End of Theme Switching code------------>
         // <----------Start of Cpu/Disk/Mem usage data pulling code------------>
         async function fetchMetrics() {
             try {

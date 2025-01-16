@@ -36,6 +36,8 @@ mkdir -p /etc/nginx/sites-available
 mkdir -p /etc/nginx/sites-enabled
 mkdir -p /var/log/nginx
 mkdir -p /var/www/html/session_tokens
+mkdir -p /var/log/xterm
+sudo chmod 755 /var/log/xterm
 sudo chmod 700 /var/www/html/session_tokens
 sudo chmod 600 /var/www/html/.env
 sudo chown -R www-data:www-data /var/www/html/
@@ -65,8 +67,8 @@ get_local_ip() {
 LOCAL_IP=$(get_local_ip)
 
 # Update the index.html file dynamically with the local IP
-sed -i "s|http://localhost:8080/metrics|http://$LOCAL_IP:8080/metrics|g" /var/www/html/dashboard.html
-sed -i "s|ws://localhost:3000|ws://$LOCAL_IP:3000|g" /var/www/html/dashboard.html
+sed -i "s|http://localhost:8080/metrics|http://$LOCAL_IP:8080/metrics|g" /var/www/html/dashboardjs.js
+sed -i "s|ws://localhost:3000|ws://$LOCAL_IP:3000|g" /var/www/html/dashboardjs.js
 
 # Detect installed PHP-FPM version
 PHP_FPM_SOCK=$(find /var/run/php/ -name "php*-fpm.sock" | head -n 1)
@@ -88,6 +90,12 @@ server {
 
     root /var/www/html;
     index login.html;
+
+    # Restrict access to important files (not all of them need to be hidden but only auth.php and login.php need to)
+    location ~ ^/(dashboardjs\.js|login\.php|auth\.php|statsPuller\.go|xtermServer\.js)$ {
+        deny all;
+        return 403;
+    }
 
     location / {
         try_files \$uri \$uri/ =404;
@@ -229,16 +237,18 @@ After=network.target
 
 [Service]
 ExecStart=/usr/bin/node /var/www/html/xtermServer.js
-WorkingDirectory=/var/www/html
 Restart=always
-User=www-data
-Group=www-data
+User=babyy
+Group=babyy
+WorkingDirectory=/var/www/html
 Environment=NODE_ENV=production
-ExecStartPre=/bin/mkdir -p /var/log/xterm
-ExecStartPre=/bin/chown -R www-data:www-data /var/www/html
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=xterm-server
 
 [Install]
 WantedBy=multi-user.target
+
 EOF
 
 # Reload systemd to apply the new service

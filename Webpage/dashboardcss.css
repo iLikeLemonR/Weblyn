@@ -1,0 +1,448 @@
+body {
+    font-family: "Roboto Mono", serif;
+    font-optical-sizing: auto;
+    font-style: normal;
+}
+
+/* Dark Mode */
+.dark-mode {
+    background-color: #121212;
+    color: #e0e0e0;
+}
+
+.dark-mode .navbar {
+    background-color: #1f1f1f;
+}
+
+.dark-mode .navbar-brand,
+.dark-mode button {
+    color: #ffffff;
+}
+
+.dark-mode .card {
+    background-color: #1e1e1e;
+    color: #e0e0e0;
+    border: none;
+    border-radius: 10px;
+    box-shadow: 5px 5px 8px rgba(3, 3, 3, 0.6);
+}
+
+.dark-mode .card-header {
+    background-color: #292929;
+    color: #ffffff;
+    font-weight: bold;
+    border-radius: 10px 10px 0 0;
+}
+
+.dark-mode textarea {
+    background-color: #202020 ;
+}
+
+.dark-mode #sidebar {
+    background-color: #1e1e1e;
+    color: #e0e0e0;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 5px 5px 8px rgba(3, 3, 3, 0.6);
+}
+
+.dark-mode .progress,
+.dark-mode .form-control,
+.dark-mode .form-select,
+.dark-mode .table th,
+.dark-mode .table td {
+    background-color: #292929;
+    color: #e0e0e0;
+    border: 1px solid #444;
+}
+.dark-mode textarea{
+    color: white;
+}
+/* Light Mode */
+.light-mode {
+    background-color: #d9efd2;
+    color: #212529;
+}
+
+.light-mode .navbar {
+    background-color: #007f72;
+}
+
+.light-mode .card {
+    background-color: #f1f9e9;
+    color: #212529;
+    border: none;
+    border-radius: 10px;
+    box-shadow: 5px 5px 8px rgba(3, 3, 3, 0.6);
+}
+
+.light-mode .card-header {
+    background-color: #94d3b3;
+    color: #000000;
+    font-weight: bold;
+    border-radius: 10px 10px 0 0;
+}
+
+.light-mode #sidebar {
+    background-color: #f1f9e9;
+    color: #212529;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 5px 5px 8px rgba(3, 3, 3, 0.6);
+}
+
+.light-mode .progress {
+    background-color: #f1f9e9;
+}
+
+.light-mode .form-control,
+.light-mode .form-select {
+    background-color: #f1f9e9;
+    color: #212529;
+    border: 1px solid #ced4da;
+}
+
+.light-mode .table th,
+.light-mode .table td {
+    background-color: #f1f9e9;
+    color: #212529;
+}
+
+.light-mode button {
+    border-color: rgb(255, 255, 255);
+    color: #ffffff;
+}
+
+.light-mode textarea {
+    background-color: rgb(216, 226, 223);
+    color: #000000;
+    border: none;
+    border-radius: 10px;
+    padding: 10px;
+    font-family: monospace;
+    resize: none;
+}
+
+/* Retro Theme */
+.retro {
+    background-color: #bda983; /* Peach yellow */
+    color: #01204E; /* Oxford blue */
+    font-family: 'Courier New', monospace;
+    border-radius: 10px; /* Rounded corners for the body */
+}
+
+.retro .navbar {
+    background-color: #028391; /* Teal */
+    border-radius: 10px; /* Rounded corners for the navbar */
+}
+
+.retro .navbar-brand,
+.retro button {
+    color: #ffffff;
+}
+
+.retro .card {
+    background-color: #F6DCAC; /* Peach yellow */
+    color: #01204E; /* Oxford blue */
+    border-radius: 10px; /* Rounded corners for cards */
+    box-shadow: none;
+}
+
+.retro .card-header {
+    background-color: #FAA968; /* Sandy brown */
+    color: #ffffff;
+    font-weight: bold;
+    border-radius: 10px 10px 0 0; /* Rounded top corners for card header */
+}
+
+.retro textarea {
+    background-color: #F6DCAC; /* Peach yellow */
+    color: #01204E; /* Oxford blue */
+    border-radius: 10px; /* Rounded corners for textarea */
+}
+
+.retro #sidebar {
+    background-color: #F6DCAC; /* Peach yellow */
+    color: #01204E; /* Oxford blue */
+    padding: 20px;
+    border-radius: 10px; /* Rounded corners for sidebar */
+    box-shadow: none;
+}
+
+.retro .progress,
+.retro .form-control,
+.retro .form-select,
+.retro .table th,
+.retro .table td {
+    background-color: #F6DCAC; /* Peach yellow */
+    color: #01204E; /* Oxford blue */
+    border: 1px solid #FAA968; /* Sandy brown */
+    border-radius: 10px; /* Rounded corners for form elements */
+}
+
+/* Solarized Theme */
+.solarized {
+    background-color: #002b36;
+    color: #839496;
+    font-family: 'Monaco', monospace;
+}
+
+.solarized .navbar {
+    background-color: #073642;
+}
+
+.solarized .navbar-brand,
+.solarized button {
+    color: #839496;
+}
+
+.solarized .card {
+    background-color: #073642;
+    color: #839496;
+    border-radius: 5px;
+    box-shadow: 3px 3px 6px rgba(0, 0, 0, 0.5);
+}
+
+.solarized .card-header {
+    background-color: #586e75;
+    color: #93a1a1;
+    font-weight: bold;
+}
+
+.solarized textarea {
+    background-color: #073642;
+    color: #839496;
+}
+
+.solarized #sidebar {
+    background-color: #073642;
+    color: #839496;
+    padding: 20px;
+    border-radius: 5px;
+    box-shadow: 3px 3px 6px rgba(0, 0, 0, 0.5);
+}
+
+.solarized .progress,
+.solarized .form-control,
+.solarized .form-select,
+.solarized .table th,
+.solarized .table td {
+    background-color: #073642;
+    color: #839496;
+    border: 1px solid #586e75;
+}
+
+/* High Contrast Theme */
+.high-contrast {
+    background-color: #000000;
+    color: #ffffff;
+}
+
+.high-contrast .navbar {
+    background-color: #1a1a1a;
+}
+
+.high-contrast .navbar-brand,
+.high-contrast button {
+    color: #ffffff;
+}
+
+.high-contrast .card {
+    background-color: #333333;
+    color: #ffffff;
+    border: 2px solid #ffffff;
+}
+
+.high-contrast .card-header {
+    background-color: #000000;
+    color: #ffffff;
+    font-weight: bold;
+}
+
+.high-contrast textarea {
+    background-color: #333333;
+    color: #ffffff;
+}
+
+.high-contrast #sidebar {
+    background-color: #333333;
+    color: #ffffff;
+    padding: 20px;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+.high-contrast .progress,
+.high-contrast .form-control,
+.high-contrast .form-select,
+.high-contrast .table th,
+.high-contrast .table td {
+    background-color: #333333;
+    color: #ffffff;
+    border: 2px solid #ffffff;
+}
+
+/* Pastel Dream Theme */
+.pastel-dream {
+    background-color: #ffefd5;
+    color: #2f4f4f;
+    font-family: 'Comic Sans MS', cursive, sans-serif;
+}
+
+.pastel-dream .navbar {
+    background-color: #ffb6c1;
+}
+
+.pastel-dream .navbar-brand,
+.pastel-dream button {
+    color: #2f4f4f;
+}
+
+.pastel-dream .card {
+    background-color: #ffe4e1;
+    color: #2f4f4f;
+    border-radius: 15px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.pastel-dream .card-header {
+    background-color: #ffb6c1;
+    color: #2f4f4f;
+    font-weight: bold;
+}
+
+.pastel-dream textarea {
+    background-color: #ffe4e1;
+    color: #2f4f4f;
+}
+
+.pastel-dream #sidebar {
+    background-color: #ffe4e1;
+    color: #2f4f4f;
+    padding: 20px;
+    border-radius: 15px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.pastel-dream .progress,
+.pastel-dream .form-control,
+.pastel-dream .form-select,
+.pastel-dream .table th,
+.pastel-dream .table td {
+    background-color: #ffe4e1;
+    color: #2f4f4f;
+    border: 1px solid #ffb6c1;
+}
+
+/* Common Styles */
+#sidebar ul {
+    padding-left: 0;
+}
+
+#sidebar ul li {
+    margin-bottom: 10px;
+}
+
+#sidebar ul li a {
+    padding: 10px;
+    display: block;
+    border-radius: 5px;
+    transition: background-color 0.3s, transform 0.2s;
+}
+
+#sidebar ul li a:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    transform: translateX(5px);
+}
+
+textarea {
+    width: 100%;
+    height: 600px;
+    border-radius: 10px;
+    border: none;
+    padding: 10px;
+    font-family: sans-serif;
+    resize: none;
+}
+
+.sticky-btn {
+    position: sticky;
+    top: 20px;
+    z-index: 1000;
+}
+
+/* Terminal specific styles */
+.terminal-input-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+}
+
+#terminal-container {
+    height: 400px;
+    padding: 10px;
+    border-radius: 5px;
+}
+
+.xterm {
+    height: 100%;
+    padding: 10px;
+}
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+.xterm-viewport::-webkit-scrollbar {
+    display: none;
+}
+
+/* Hide scrollbar for Firefox */
+.xterm-viewport {
+    scrollbar-width: none;
+}
+
+/* Hide scrollbar for IE and Edge */
+.xterm-viewport {
+    -ms-overflow-style: none;
+}
+
+/* Theme-specific terminal styles */
+.dark-mode .xterm-viewport,
+.dark-mode .xterm-screen {
+    background-color: #1e1e1e !important;
+}
+
+.light-mode .xterm-viewport,
+.light-mode .xterm-screen {
+    background-color: #f1f9e9 !important;
+}
+
+.retro .xterm-viewport,
+.retro .xterm-screen {
+    background-color: #F6DCAC !important;
+}
+
+.solarized .xterm-viewport,
+.solarized .xterm-screen {
+    background-color: #073642 !important;
+}
+
+/* Cpu/Memory/Disk usage bars */
+.progress {
+    position: relative; /* Ensures the child elements are positioned relative to the progress container */
+    height: 25px; /* Set the height for consistency */
+}
+
+.progress-text {
+    position: absolute; /* Absolute positioning to place the text within the progress container */
+    top: 50%; /* Vertically center the text */
+    left: 50%; /* Horizontally center the text */
+    transform: translate(-50%, -50%); /* Adjust for the element's own dimensions */
+    color: #ffffff; /* White text color for visibility */
+    text-shadow: 0 0 10px #000000, 0 0 5px #000000;                            font-weight: bold; /* Make the text bold */
+    z-index: 2; /* Ensure the text is above the progress bar */
+    pointer-events: none; /* Prevent the text from blocking interaction with the progress bar */
+}
+
+.progress-bar {
+    height: 100%; /* Ensure the bar fills the height of the container */
+}

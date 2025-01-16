@@ -26,6 +26,7 @@ echo "Reinstalling NGINX and ensuring correct setup..."
 apt-get update
 apt-get install --reinstall -y nginx-full nginx-common nginx-extras
 apt-get install -y php-fpm
+apt install nodejs
 
 # Ensure necessary NGINX directories exist
 echo "Ensuring necessary NGINX directories exist..."
@@ -177,10 +178,11 @@ else
 fi
 
 # Initialize Go module in /var/www/html
-echo "Initializing Go module in /var/www/html..."
+echo "Initializing Go module and xterm@xterm using npm in /var/www/html..."
+cd /var/www/html
+npm install @xterm/xterm
 export PATH=$PATH:/usr/local/go/bin
 export GOPATH=$HOME/go
-cd /var/www/
 go mod init statsPuller.com/statsPuller
 
 # Install Go libraries

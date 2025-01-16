@@ -3,3 +3,8 @@ and stuff following the mouse.
 
 and ofc all that is after finishing the main page
 then fix all themes cuz colors are  so bad
+
+fix the setup.sh file to check for the versions of all needed packages before installing new ones
+and before skipping them knowing that there is a version of the needed package even if its old
+meaning that instead of checking if there is GoLang or not, it checks if that is the latest version and
+the same for nodejs, npm, nginx and anything needed later

@@ -8,7 +8,6 @@ fi
 
 CURRENT_USER=${SUDO_USER:-$(whoami)}
 
-mkdir -p /var/www
 mkdir -p /var/www/html
 touch /var/www/html/.env
 touch /var/www/html/.env2

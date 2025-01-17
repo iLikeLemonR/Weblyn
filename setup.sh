@@ -48,12 +48,13 @@ sudo chmod 600 /var/www/html/.env2
 sudo chown -R www-data:www-data /var/www/html/
 
 # Pull the login.html, login.php, auth.php, xtermServer.js, and dashboard.html pages to the correct directory
-echo "Pulling login.html, login.php, auth.php, statsPuller.go, and dashboard.html..."
+echo "Pulling login.html, login.php, auth.php, statsPuller.go, and dashboard.html (and all the files it needs)..."
 wget -q -O /var/www/html/login.html https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/login.html
 wget -q -O /var/www/html/login.php https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/login.php
 wget -q -O /var/www/html/auth.php https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/auth.php
 wget -q -O /var/www/html/statsPuller.go https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/statsPuller.go
 wget -q -O /var/www/html/dashboard.html https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/dashboard.html
+wget -q -O /var/www/html/dashboardcss.css https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/dashboardcss.css
 wget -q -O /var/www/html/xtermServer.js https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/xtermServer.js
 
 # Ensure the NGINX service exists and is running

@@ -1,3 +1,23 @@
+/* Usage bars styling */
+.progress {
+    position: relative; /* Ensures the child elements are positioned relative to the progress container */
+    height: 25px; /* Set the height for consistency */
+}
+
+.progress-text {
+    position: absolute; /* Absolute positioning to place the text within the progress container */
+    top: 50%; /* Vertically center the text */
+    left: 50%; /* Horizontally center the text */
+    transform: translate(-50%, -50%); /* Adjust for the element's own dimensions */
+    color: #ffffff; /* White text color for visibility */
+    text-shadow: 0 0 10px #000000, 0 0 5px #000000;                            font-weight: bold; /* Make the text bold */
+    z-index: 2; /* Ensure the text is above the progress bar */
+    pointer-events: none; /* Prevent the text from blocking interaction with the progress bar */
+}
+
+.progress-bar {
+    height: 100%; /* Ensure the bar fills the height of the container */
+}
 body {
     font-family: "Roboto Mono", serif;
     font-optical-sizing: auto;
@@ -380,7 +400,7 @@ textarea {
 }
 
 #terminal-container {
-    height: 400px;
+    height: 700px;
     padding: 10px;
     border-radius: 5px;
 }
@@ -424,24 +444,4 @@ textarea {
 .solarized .xterm-viewport,
 .solarized .xterm-screen {
     background-color: #073642 !important;
-}
-
-.progress {
-    position: relative; /* Ensures the child elements are positioned relative to the progress container */
-    height: 25px; /* Set the height for consistency */
-}
-
-.progress-text {
-    position: absolute; /* Absolute positioning to place the text within the progress container */
-    top: 50%; /* Vertically center the text */
-    left: 50%; /* Horizontally center the text */
-    transform: translate(-50%, -50%); /* Adjust for the element's own dimensions */
-    color: #ffffff; /* White text color for visibility */
-    text-shadow: 0 0 10px #000000, 0 0 5px #000000;                            font-weight: bold; /* Make the text bold */
-    z-index: 2; /* Ensure the text is above the progress bar */
-    pointer-events: none; /* Prevent the text from blocking interaction with the progress bar */
-}
-
-.progress-bar {
-    height: 100%; /* Ensure the bar fills the height of the container */
 }

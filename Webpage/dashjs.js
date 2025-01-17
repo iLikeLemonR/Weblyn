@@ -20,7 +20,9 @@ const term = new Terminal({
     theme: {
         background: '#1e1e1e',
         foreground: '#ffffff'
-    }
+    },
+    allowProposedApi: true,
+    cursorStyle: 'block'
 });
 
 const fitAddon = new FitAddon.FitAddon();
@@ -30,28 +32,40 @@ term.loadAddon(fitAddon);
 term.open(document.getElementById('terminal-container'));
 fitAddon.fit();
 
-// Terminal themes
-const terminalThemes = {
-    'dark-mode': { background: '#1e1e1e', foreground: '#ffffff' },
-    'light-mode': { background: '#f1f9e9', foreground: '#000000' },
-    'retro': { background: '#F6DCAC', foreground: '#01204E' },
-    'solarized': { background: '#073642', foreground: '#839496' },
-    'high-contrast': { background: '#333333', foreground: '#ffffff' },
-    'pastel-dream': { background: '#ffe4e1', foreground: '#2f4f4f' }
-};
+// Terminal state management
+let commandHistory = [];
+let historyIndex = -1;
+let currentLine = '';
+let cursorPosition = 0;
+const prompt = '$ ';
+let currentPrompt = '';
 
-function updateTerminalTheme(themeName) {
-    term.setOption('theme', terminalThemes[themeName]);
+function refreshLine() {
+    const fullLine = prompt + currentLine;
+    term.write('\r' + ' '.repeat(term.cols)); // Clear the line
+    term.write('\r' + fullLine); // Rewrite the line
+    
+    // Move cursor to correct position
+    const targetPosition = prompt.length + cursorPosition;
+    const currentPos = prompt.length + currentLine.length;
+    if (targetPosition < currentPos) {
+        term.write('\x1b[' + (currentPos - targetPosition) + 'D');
+    }
 }
 
-// Offline terminal functionality
-let commandHistory = [];
-let historyIndex = 0;
-let currentLine = '';
-let prompt = '$ ';
+function clearCurrentLine() {
+    const currentPos = prompt.length + cursorPosition;
+    term.write('\r' + ' '.repeat(term.cols));
+    term.write('\r');
+}
 
 // Initialize terminal with prompt
-term.write('\r\n' + prompt);
+function writePrompt() {
+    currentPrompt = prompt;
+    term.write('\r\n' + prompt);
+}
+
+writePrompt();
 
 // Command handling
 function handleCommand(command) {
@@ -59,7 +73,6 @@ function handleCommand(command) {
         commandHistory.push(command);
         historyIndex = commandHistory.length;
 
-        // Simple command processing
         let output = '';
         switch (command.trim().toLowerCase()) {
             case 'help':
@@ -71,6 +84,7 @@ function handleCommand(command) {
                         'history  - Show command history\n\r';
                 break;
             case 'clear':
+                writePrompt();
                 term.clear();
                 return;
             case 'date':
@@ -88,7 +102,7 @@ function handleCommand(command) {
         }
         term.write('\r\n' + output);
     }
-    term.write('\r\n' + prompt);
+    writePrompt();
 }
 
 // Handle terminal input
@@ -96,34 +110,100 @@ term.onKey((e) => {
     const ev = e.domEvent;
     const printable = !ev.altKey && !ev.ctrlKey && !ev.metaKey;
 
-    if (ev.keyCode === 13) { // Enter key
-        term.write('\r\n');
-        handleCommand(currentLine);
+    // Handle Ctrl+V (paste)
+    if (ev.ctrlKey && ev.code === 'KeyV') {
+        navigator.clipboard.readText().then(text => {
+            // Insert text at cursor position
+            currentLine = currentLine.slice(0, cursorPosition) + text + currentLine.slice(cursorPosition);
+            cursorPosition += text.length;
+            refreshLine();
+        });
+        return;
+    }
+
+    // Handle Ctrl+C (cancel)
+    if (ev.ctrlKey && ev.code === 'KeyC') {
+        term.write('^C');
         currentLine = '';
-    } else if (ev.keyCode === 8) { // Backspace
-        if (currentLine.length > 0) {
-            currentLine = currentLine.substr(0, currentLine.length - 1);
-            term.write('\b \b');
-        }
-    } else if (ev.keyCode === 38) { // Up arrow
-        if (historyIndex > 0) {
-            historyIndex--;
-            currentLine = commandHistory[historyIndex];
-            term.write('\r\x1B[K' + prompt + currentLine);
-        }
-    } else if (ev.keyCode === 40) { // Down arrow
-        if (historyIndex < commandHistory.length - 1) {
-            historyIndex++;
-            currentLine = commandHistory[historyIndex];
-            term.write('\r\x1B[K' + prompt + currentLine);
-        } else {
-            historyIndex = commandHistory.length;
+        cursorPosition = 0;
+        writePrompt();
+        return;
+    }
+
+    switch (ev.keyCode) {
+        case 13: // Enter
+            term.write('\r\n');
+            handleCommand(currentLine);
             currentLine = '';
-            term.write('\r\x1B[K' + prompt);
-        }
-    } else if (printable) {
-        currentLine += e.key;
-        term.write(e.key);
+            cursorPosition = 0;
+            break;
+
+        case 8: // Backspace
+            if (cursorPosition > 0) {
+                currentLine = currentLine.slice(0, cursorPosition - 1) + currentLine.slice(cursorPosition);
+                cursorPosition--;
+                refreshLine();
+            }
+            break;
+
+        case 46: // Delete
+            if (cursorPosition < currentLine.length) {
+                currentLine = currentLine.slice(0, cursorPosition) + currentLine.slice(cursorPosition + 1);
+                refreshLine();
+            }
+            break;
+
+        case 37: // Left arrow
+            if (cursorPosition > 0) {
+                cursorPosition--;
+                refreshLine();
+            }
+            break;
+
+        case 39: // Right arrow
+            if (cursorPosition < currentLine.length) {
+                cursorPosition++;
+                refreshLine();
+            }
+            break;
+
+        case 38: // Up arrow
+            if (historyIndex > 0) {
+                historyIndex--;
+                currentLine = commandHistory[historyIndex];
+                cursorPosition = currentLine.length;
+                refreshLine();
+            }
+            break;
+
+        case 40: // Down arrow
+            if (historyIndex < commandHistory.length - 1) {
+                historyIndex++;
+                currentLine = commandHistory[historyIndex];
+            } else {
+                historyIndex = commandHistory.length;
+                currentLine = '';
+            }
+            cursorPosition = currentLine.length;
+            refreshLine();
+            break;
+
+        case 36: // Home
+            cursorPosition = 0;
+            refreshLine();
+            break;
+
+        case 35: // End
+            cursorPosition = currentLine.length;
+            refreshLine();
+            break;
+
+        default:
+            if (printable && !ev.altKey && !ev.ctrlKey && !ev.metaKey) {
+                currentLine = currentLine.slice(0, cursorPosition) + e.key + currentLine.slice(cursorPosition);
+                cursorPosition++;
+                refreshLine();
+            }
     }
 });
 
@@ -132,27 +212,32 @@ window.addEventListener('resize', () => {
     fitAddon.fit();
 });
 
-// Optional: WebSocket connection setup (if server is available)
+// WebSocket connection setup
 try {
     const ws = new WebSocket(`ws://localhost:3000`);
     
     ws.onopen = () => {
         term.writeln('WebSocket connection established');
+        writePrompt();
     };
 
     ws.onmessage = (event) => {
         term.writeln(event.data);
+        writePrompt();
     };
 
     ws.onerror = () => {
         term.writeln('WebSocket connection failed - falling back to offline mode');
+        writePrompt();
     };
 
     ws.onclose = () => {
         term.writeln('WebSocket connection closed');
+        writePrompt();
     };
 } catch (error) {
     term.writeln('Operating in offline mode');
+    writePrompt();
 }
 // <----------End of XTerm code------------>
 // <----------Start of Cpu/Disk/Mem usage data pulling code------------>

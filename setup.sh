@@ -55,6 +55,7 @@ wget -q -O /var/www/html/auth.php https://raw.githubusercontent.com/iLikeLemonR/
 wget -q -O /var/www/html/statsPuller.go https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/statsPuller.go
 wget -q -O /var/www/html/dashboard.html https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/dashboard.html
 wget -q -O /var/www/html/dashboardcss.css https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/dashboardcss.css
+wget -q -O /var/www/html/dashboardcss.css https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/dashboardjs.js
 wget -q -O /var/www/html/xtermServer.js https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/xtermServer.js
 
 # Ensure the NGINX service exists and is running

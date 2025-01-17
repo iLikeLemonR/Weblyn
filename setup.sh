@@ -96,12 +96,6 @@ server {
     root /var/www/html;
     index login.html;
 
-    # Restrict access to important files (not all of them need to be hidden but only auth.php and login.php need to)
-    location ~ ^/(dashboardjs\.js|login\.php|auth\.php|statsPuller\.go|xtermServer\.js)$ {
-        deny all;
-        return 403;
-    }
-
     location / {
         try_files \$uri \$uri/ =404;
     }

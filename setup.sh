@@ -37,9 +37,14 @@ mkdir -p /etc/nginx/sites-enabled
 mkdir -p /var/log/nginx
 mkdir -p /var/www/html/session_tokens
 mkdir -p /var/log/xterm
+mkdir -p /var/www/html/.env2
 sudo chmod 755 /var/log/xterm
 sudo chmod 700 /var/www/html/session_tokens
 sudo chmod 600 /var/www/html/.env
+sudo chmod 600 /var/www/html/.env2
+cat > "/var/www/html/.env2" <<EOF 
+/var/www/html/session_tokens/
+EOF
 sudo chown -R www-data:www-data /var/www/html/
 
 # Pull the login.html, login.php, auth.php, xtermServer.js, and dashboard.html pages to the correct directory

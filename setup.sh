@@ -9,10 +9,6 @@ fi
 CURRENT_USER=${SUDO_USER:-$(whoami)}
 
 touch /var/www/html/.env
-touch /var/www/html/.env2
-cat > "/var/www/html/.env2" <<EOF 
-/var/www/html/session_tokens/
-EOF
 
 # Prompt user for username and password for login
 echo "Enter a username for the login page:"
@@ -41,6 +37,10 @@ mkdir -p /etc/nginx/sites-enabled
 mkdir -p /var/log/nginx
 mkdir -p /var/www/html/session_tokens
 mkdir -p /var/log/xterm
+touch /var/www/html/.env2
+cat > "/var/www/html/.env2" <<EOF 
+/var/www/html/session_tokens/
+EOF
 sudo chmod 755 /var/log/xterm
 sudo chmod 700 /var/www/html/session_tokens
 sudo chmod 600 /var/www/html/.env

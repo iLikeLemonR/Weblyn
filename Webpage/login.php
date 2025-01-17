@@ -32,7 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         setcookie('session_token', $session_token, time() + 1, '/', '', isset($_SERVER['HTTPS']), true);  // Secure cookie
         
         // Save the session token to a file or database securely
-        $token_file = '/var/www/html/session_tokens/' . md5($session_token);  // Use md5 to name the file
+        $token_file = file_get_contents('.env2') . md5($session_token);  // Use md5 to name the file
         file_put_contents($token_file, $session_token);
         
         // Redirect the user to the dashboard

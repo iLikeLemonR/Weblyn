@@ -1,5 +1,5 @@
 const express = require('express');
-const pty = require('node-pty'); // Use node-pty instead of pty.js
+const pty = require('node-pty');
 const path = require('path');
 const WebSocket = require('ws');
 

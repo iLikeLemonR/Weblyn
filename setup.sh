@@ -79,6 +79,7 @@ LOCAL_IP=$(get_local_ip)
 # Update the index.html file dynamically with the local IP
 sed -i "s|http://localhost:8080/metrics|http://$LOCAL_IP:8080/metrics|g" /var/www/html/dashjs.js
 sed -i "s|ws://localhost:3000|ws://$LOCAL_IP:3000|g" /var/www/html/dashjs.js
+sed -i "s|ws://localhost:3000|ws://$LOCAL_IP:3000|g" /var/www/html/testdashjs.js
 
 # Detect installed PHP-FPM version
 PHP_FPM_SOCK=$(find /var/run/php/ -name "php*-fpm.sock" | head -n 1)

@@ -1,65 +1,37 @@
-const express = require('express');
-const pty = require('node-pty'); // Use node-pty instead of pty.js
-const path = require('path');
 const WebSocket = require('ws');
+const { exec } = require('child_process');
 
-const app = express();
-
-// Serve the frontend
-app.use(express.static(path.join(__dirname, 'public')));
-
-// Create WebSocket server
-const wss = new WebSocket.Server({ noServer: true });
-const shell = pty.spawn(process.env.SHELL || '/bin/bash', [], {
-  name: 'xterm-256color',
-  cols: 80,
-  rows: 30,
-  cwd: process.env.HOME,
-  env: process.env,
+// Create a WebSocket server on port 3000
+const wss = new WebSocket.Server({ port: 3000 }, () => {
+  console.log('WebSocket server is running on ws://localhost:3000');
 });
 
 wss.on('connection', (ws) => {
-  // Send shell output to WebSocket client
-  shell.on('data', (data) => {
-    console.log("shell outputted: " + data);
-    ws.send(data);
-  });
-});
+  console.log('New client connected');
 
-wss.on('message', (ws) => {
-  // Create a pseudo-terminal
-  console.log("connection made");
-
-  // Send shell output to WebSocket client
-  shell.on('data', (data) => {
-    console.log("shell outputted: " + data);
-    ws.send(data);
-  });
-
-  // Send WebSocket client input to the shell
+  // Listen for messages from the client
   ws.on('message', (message) => {
-    console.log("message received from client: " + message);
-    shell.write(message);
+    console.log(`Received command: ${message}`);
+
+    // Execute the command in the terminal
+    exec(message, (error, stdout, stderr) => {
+      if (error) {
+        ws.send(`Error: ${error.message}`);
+        return;
+      }
+      if (stderr) {
+        ws.send(`Stderr: ${stderr}`);
+        return;
+      }
+      ws.send(`Output: ${stdout}`);
+    });
   });
 
-  // Handle terminal resize
-  ws.on('resize', (size) => {
-    if (shell) shell.resize(size.cols, size.rows);
-  });
-
-  // Clean up on WebSocket close
   ws.on('close', () => {
-    shell.kill();
+    console.log('Client disconnected');
   });
-});
 
-// Upgrade HTTP server for WebSocket
-const server = app.listen(3000, () => {
-  console.log('Server running at http://localhost:3000');
-});
-
-server.on('upgrade', (request, socket, head) => {
-  wss.handleUpgrade(request, socket, head, (ws) => {
-    wss.emit('connection', ws, request);
+  ws.on('error', (err) => {
+    console.error(`WebSocket error: ${err}`);
   });
 });

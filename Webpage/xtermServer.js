@@ -12,7 +12,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Create WebSocket server
 const wss = new WebSocket.Server({ noServer: true });
 
-wss.on('message', (ws) => {
+wss.on('connection', (ws) => {
   // Create a pseudo-terminal
   const shell = pty.spawn(process.env.SHELL || '/bin/bash', [], {
     name: 'xterm-256color',

@@ -1,4 +1,3 @@
-const WebSocket = require('ws');
 // <----------Start of Theme Switching code------------>
 document.querySelectorAll('.dropdown-item[data-theme]').forEach(item => {
     item.addEventListener('click', (e) => {
@@ -216,9 +215,7 @@ term.onKey((e) => {
         case 13: // Enter
             term.write('\r\n');
             currentLine = '';
-            ws.on('open', () => {
-                ws.send(currentPrompt)
-            });    
+            ws.send(currentPrompt)
             cursorPosition = 0;
             break;
 

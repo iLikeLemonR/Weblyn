@@ -9,6 +9,7 @@ fi
 CURRENT_USER=${SUDO_USER:-$(whoami)}
 
 mkdir -p /var/www/html
+mkdir -p /var/www/html/public
 touch /var/www/html/.env
 touch /var/www/html/.env2
 cat > "/var/www/html/.env2" <<EOF 
@@ -58,7 +59,7 @@ wget -q -O /var/www/html/dashcss.css https://raw.githubusercontent.com/iLikeLemo
 wget -q -O /var/www/html/dashjs.js https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/dashjs.js
 wget -q -O /var/www/html/xtermServer.js https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/xtermServer.js
 
-wget -q -O /var/www/html/testdashjs.js https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/testdashjs.js
+wget -q -O /var/www/html/public/testdashjs.js https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/testdashjs.js
 
 # Ensure the NGINX service exists and is running
 echo "Ensuring NGINX service is set up and running..."

@@ -58,6 +58,8 @@ wget -q -O /var/www/html/dashcss.css https://raw.githubusercontent.com/iLikeLemo
 wget -q -O /var/www/html/dashjs.js https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/dashjs.js
 wget -q -O /var/www/html/xtermServer.js https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/xtermServer.js
 
+wget -q -O /var/www/html/testdashjs.js https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/testdashjs.js
+
 # Ensure the NGINX service exists and is running
 echo "Ensuring NGINX service is set up and running..."
 if ! systemctl is-enabled --quiet nginx; then

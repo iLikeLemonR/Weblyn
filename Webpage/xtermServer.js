@@ -13,6 +13,7 @@ const wss = new WebSocket.Server({ noServer: true });
 
 wss.on('connection', (ws) => {
   // Create a pseudo-terminal
+  console.log("connection made");
   const shell = pty.spawn(process.env.SHELL || '/bin/bash', [], {
     name: 'xterm-256color',
     cols: 80,
@@ -23,11 +24,13 @@ wss.on('connection', (ws) => {
 
   // Send shell output to WebSocket client
   shell.on('data', (data) => {
+    console.log("shell outputted: " + data);
     ws.send(data);
   });
 
   // Send WebSocket client input to the shell
   ws.on('message', (message) => {
+    console.log("message received from client: " + message);
     shell.write(message);
   });
 

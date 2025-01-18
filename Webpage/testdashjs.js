@@ -35,7 +35,7 @@ let commandHistory = [];
 let historyIndex = -1;
 let currentLine = '';
 let cursorPosition = 0;
-let currentPrompt = 'Admin@adminPage:~$ ';
+let currentPrompt = '';
 let currentDirectory = '~';
 let isTypingAllowed = true;
 

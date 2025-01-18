@@ -1,10 +1,9 @@
 const express = require('express');
-const pty = require('node-pty');
+const pty = require('node-pty'); // Use node-pty instead of pty.js
 const path = require('path');
 const WebSocket = require('ws');
 
 const app = express();
-const ws = new WebSocket('ws://localhost:3000');
 
 // Serve the frontend
 app.use(express.static(path.join(__dirname, 'public')));

@@ -67,41 +67,122 @@ function writePrompt() {
 
 writePrompt();
 
-// Command handling
-function handleCommand(command) {
-    if (command.trim() !== '') {
-        commandHistory.push(command);
-        historyIndex = commandHistory.length;
-
-        let output = '';
-        switch (command.trim().toLowerCase()) {
-            case 'help':
-                output = 'Available commands:\n\r' +
-                        'help     - Show this help message\n\r' +
-                        'clear    - Clear the terminal\n\r' +
-                        'date     - Show current date and time\n\r' +
-                        'echo     - Echo the input\n\r' +
-                        'history  - Show command history\n\r';
-                break;
-            case 'clear':
-                writePrompt();
-                term.clear();
-                return;
-            case 'date':
-                output = new Date().toString();
-                break;
-            case 'history':
-                output = commandHistory.map((cmd, i) => `${i + 1}  ${cmd}`).join('\n\r');
-                break;
-            default:
-                if (command.trim().toLowerCase().startsWith('echo ')) {
-                    output = command.substring(5);
-                } else {
-                    output = `Command not found: ${command}`;
-                }
+// Theme Switching Functionality
+document.addEventListener('DOMContentLoaded', () => {
+    // Store the theme handlers in an object
+    const themeHandlers = {
+        'dark-mode': () => {
+            document.body.className = 'dark-mode';
+            updateTerminalTheme('dark-mode');
+        },
+        'light-mode': () => {
+            document.body.className = 'light-mode';
+            updateTerminalTheme('light-mode');
+        },
+        'retro': () => {
+            document.body.className = 'retro';
+            updateTerminalTheme('retro');
+        },
+        'solarized': () => {
+            document.body.className = 'solarized';
+            updateTerminalTheme('solarized');
+        },
+        'high-contrast': () => {
+            document.body.className = 'high-contrast';
+            // Add terminal theme for high contrast if needed
+        },
+        'pastel-dream': () => {
+            document.body.className = 'pastel-dream';
+            // Add terminal theme for pastel dream if needed
         }
-        term.write('\r\n' + output);
+    };
+
+    // Add click handlers for each theme option
+    const themeDropdownItems = document.querySelectorAll('.dropdown-item[data-theme]');
+    themeDropdownItems.forEach(item => {
+        item.addEventListener('click', (e) => {
+            e.preventDefault();
+            const selectedTheme = e.target.getAttribute('data-theme');
+            
+            // Remove all existing theme classes
+            document.body.classList.remove('dark-mode', 'light-mode', 'retro', 'solarized', 'high-contrast', 'pastel-dream');
+            
+            // Apply the selected theme
+            if (themeHandlers[selectedTheme]) {
+                themeHandlers[selectedTheme]();
+            }
+            
+            // Store the selected theme in localStorage for persistence
+            localStorage.setItem('preferred-theme', selectedTheme);
+        });
+    });
+
+    // Load saved theme on page load
+    const savedTheme = localStorage.getItem('preferred-theme');
+    if (savedTheme && themeHandlers[savedTheme]) {
+        themeHandlers[savedTheme]();
     }
+});
+
+// Update the terminal themes object to include all theme options
+const terminalThemes = {
+    'dark-mode': { 
+        background: '#1e1e1e', 
+        foreground: '#ffffff' 
+    },
+    'light-mode': { 
+        background: '#f1f9e9', 
+        foreground: '#000000' 
+    },
+    'retro': { 
+        background: '#F6DCAC', 
+        foreground: '#01204E' 
+    },
+    'solarized': { 
+        background: '#073642', 
+        foreground: '#839496' 
+    },
+    'high-contrast': { 
+        background: '#333333', 
+        foreground: '#ffffff' 
+    },
+    'pastel-dream': { 
+        background: '#ffe4e1', 
+        foreground: '#2f4f4f' 
+    }
+};
+
+function updateTerminalTheme(themeName) {
+    if (terminalThemes[themeName]) {
+        term.setOption('theme', terminalThemes[themeName]);
+    }
+}
+
+// WebSocket connection setup
+try {
+    const ws = new WebSocket(`ws://localhost:3000`);
+    
+    ws.onopen = () => {
+        term.writeln('WebSocket connection established');
+        writePrompt();
+    };
+
+    ws.onmessage = (event) => {
+        term.writeln(event.data);
+        writePrompt();
+    };
+
+    ws.onerror = () => {
+        term.writeln('WebSocket connection failed - falling back to offline mode');
+        writePrompt();
+    };
+
+    ws.onclose = () => {
+        term.writeln('WebSocket connection closed');
+        writePrompt();
+    };
+} catch (error) {
+    term.writeln('Operating in offline mode');
     writePrompt();
 }
 
@@ -133,8 +214,8 @@ term.onKey((e) => {
     switch (ev.keyCode) {
         case 13: // Enter
             term.write('\r\n');
-            handleCommand(currentLine);
             currentLine = '';
+            ws.send(term.data)
             cursorPosition = 0;
             break;
 
@@ -212,33 +293,6 @@ window.addEventListener('resize', () => {
     fitAddon.fit();
 });
 
-// WebSocket connection setup
-try {
-    const ws = new WebSocket(`ws://localhost:3000`);
-    
-    ws.onopen = () => {
-        term.writeln('WebSocket connection established');
-        writePrompt();
-    };
-
-    ws.onmessage = (event) => {
-        term.writeln(event.data);
-        writePrompt();
-    };
-
-    ws.onerror = () => {
-        term.writeln('WebSocket connection failed - falling back to offline mode');
-        writePrompt();
-    };
-
-    ws.onclose = () => {
-        term.writeln('WebSocket connection closed');
-        writePrompt();
-    };
-} catch (error) {
-    term.writeln('Operating in offline mode');
-    writePrompt();
-}
 // <----------End of XTerm code------------>
 // <----------Start of Cpu/Disk/Mem usage data pulling code------------>
 async function fetchMetrics() {

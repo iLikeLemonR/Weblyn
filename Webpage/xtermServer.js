@@ -4,6 +4,7 @@ const path = require('path');
 const WebSocket = require('ws');
 
 const app = express();
+const ws = new WebSocket('ws://localhost:3000');
 
 // Serve the frontend
 app.use(express.static(path.join(__dirname, 'public')));
@@ -11,7 +12,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Create WebSocket server
 const wss = new WebSocket.Server({ noServer: true });
 
-wss.on('connection', (ws) => {
+wss.on('message', (ws) => {
   // Create a pseudo-terminal
   const shell = pty.spawn(process.env.SHELL || '/bin/bash', [], {
     name: 'xterm-256color',

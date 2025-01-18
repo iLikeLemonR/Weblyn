@@ -1,3 +1,4 @@
+const WebSocket = require('ws');
 // <----------Start of Theme Switching code------------>
 document.querySelectorAll('.dropdown-item[data-theme]').forEach(item => {
     item.addEventListener('click', (e) => {
@@ -37,7 +38,7 @@ let commandHistory = [];
 let historyIndex = -1;
 let currentLine = '';
 let cursorPosition = 0;
-const prompt = '$ ';
+const prompt = 'Admin@adminPage-$ ';
 let currentPrompt = '';
 
 function refreshLine() {
@@ -215,7 +216,9 @@ term.onKey((e) => {
         case 13: // Enter
             term.write('\r\n');
             currentLine = '';
-            ws.send(term.data)
+            ws.on('open', () => {
+                ws.send(currentPrompt)
+            });    
             cursorPosition = 0;
             break;
 

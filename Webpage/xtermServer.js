@@ -13,8 +13,18 @@ wss.on('connection', (ws) => {
   ws.on('message', (message) => {
     console.log(`Received command: ${message}`);
 
-    // Execute the command in the terminal
-    exec(message, (error, stdout, stderr) => {
+  ws.on('close', () => {
+    console.log('Client disconnected');
+  });
+
+  ws.on('error', (err) => {
+    console.error(`WebSocket error: ${err}`);
+  });
+});
+
+wss.on('message', (ws) => {
+  // Execute the command in the terminal
+  exec(message, (error, stdout, stderr) => {
       if (error) {
         ws.send(`Error: ${error.message}`);
         return;
@@ -25,13 +35,5 @@ wss.on('connection', (ws) => {
       }
       ws.send(`Output: ${stdout}`);
     });
-  });
-
-  ws.on('close', () => {
-    console.log('Client disconnected');
-  });
-
-  ws.on('error', (err) => {
-    console.error(`WebSocket error: ${err}`);
   });
 });

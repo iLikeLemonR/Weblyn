@@ -1,4 +1,4 @@
-# General-Server-Setup
+# Weblyn
 
 🚧 **Warning: This project is incomplete and still under development!** 🚧
 

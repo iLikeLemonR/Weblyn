@@ -53,5 +53,4 @@ Contributions are welcome! Once the base version is stable, contribution guideli
 
 ---
 
-Stay tuned for updates! 🚀
 

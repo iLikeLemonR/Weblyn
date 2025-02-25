@@ -1,3 +1,5 @@
+Easiest: Change entire dashboard look.
+
 User Management – Add user accounts, set permissions, and manage authentication.
 System Performance Monitoring+ – network statistics, and load averages.
 Service Management – Start, stop, restart, and monitor essential services.

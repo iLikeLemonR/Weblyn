@@ -24,3 +24,6 @@ Easiest: Change entire dashboard look.
     - ServerPilot
     - VestaCP
     - Ajenti
+
+
+*Recommendations are appreciated*

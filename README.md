@@ -8,7 +8,7 @@
 
 ## 📌 Overview
 
-**Weblyn** project is a project that includes shell script (`.sh`) designed to automate the installation and setup of a Linux-based server. It provides a secure, web-based dashboard for managing the server, monitoring system performance, and accessing essential functionalities.
+**Weblyn** is a project that includes a shell script (`.sh`) designed to automate the installation and setup of a Linux-based server. It provides a secure, web-based dashboard for managing the server, monitoring system performance, and accessing all essential functionalities.
 
 ✅ **Supported Distributions:** This script is designed to work on Debian-based Linux distributions, including:
   - Ubuntu

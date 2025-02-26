@@ -41,25 +41,20 @@ mkdir -p /etc/nginx/sites-available
 mkdir -p /etc/nginx/sites-enabled
 mkdir -p /var/log/nginx
 mkdir -p /var/www/html/session_tokens
-mkdir -p /var/log/xterm
-sudo chmod 755 /var/log/xterm
 sudo chmod 700 /var/www/html/session_tokens
 sudo chmod 600 /var/www/html/.env
 sudo chmod 600 /var/www/html/.env2
 sudo chown -R www-data:www-data /var/www/html/
 
-# Pull the login.html, login.php, auth.php, xtermServer.js, and dashboard.html pages to the correct directory
+# Pull the login.html, login.php, auth.php and dashboard.html pages to the correct directory
 echo "Pulling login.html, login.php, auth.php, statsPuller.go, and dashboard.html (and all the files it needs)..."
-wget -q -O /var/www/html/login.html https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/login.html
-wget -q -O /var/www/html/login.php https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/login.php
-wget -q -O /var/www/html/auth.php https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/auth.php
-wget -q -O /var/www/html/statsPuller.go https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/statsPuller.go
-wget -q -O /var/www/html/dashboard.html https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/dashboard.html
-wget -q -O /var/www/html/dashcss.css https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/dashcss.css
-wget -q -O /var/www/html/dashjs.js https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/dashjs.js
-wget -q -O /var/www/html/xtermServer.js https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/xtermServer.js
-
-wget -q -O /var/www/html/public/testdashjs.js https://raw.githubusercontent.com/iLikeLemonR/General-Server-Setup/refs/heads/main/Webpage/testdashjs.js
+wget -q -O /var/www/html/login.html https://raw.githubusercontent.com/iLikeLemonR/Weblyn/refs/heads/main/Webpage/login.html
+wget -q -O /var/www/html/login.php https://raw.githubusercontent.com/iLikeLemonR/Weblyn/refs/heads/main/Webpage/login.php
+wget -q -O /var/www/html/auth.php https://raw.githubusercontent.com/iLikeLemonR/Weblyn/refs/heads/main/Webpage/auth.php
+wget -q -O /var/www/html/statsPuller.go https://raw.githubusercontent.com/iLikeLemonR/Weblyn/refs/heads/main/Webpage/statsPuller.go
+wget -q -O /var/www/html/dashboard.html https://raw.githubusercontent.com/iLikeLemonR/Weblyn/refs/heads/main/Webpage/dashboard.html
+wget -q -O /var/www/html/dashcss.css https://raw.githubusercontent.com/iLikeLemonR/Weblyn/refs/heads/main/Webpage/dashcss.css
+wget -q -O /var/www/html/dashjs.js https://raw.githubusercontent.com/iLikeLemonR/Weblyn/refs/heads/main/Webpage/dashjs.js
 
 # Ensure the NGINX service exists and is running
 echo "Ensuring NGINX service is set up and running..."
@@ -196,10 +191,10 @@ else
 fi
 
 # Initialize Go module in /var/www/html
-echo "Initializing Go module and xterm@xterm using npm in /var/www/html..."
+echo "Initializing Go module and using npm in /var/www/html..."
 cd /var/www/html
 npm init -y 
-npm install express xterm node-pty ws
+npm install express node-pty ws
 go mod init statsPuller.com/statsPuller
 
 # Install Go libraries
@@ -233,42 +228,15 @@ Restart=always
 WantedBy=multi-user.target
 EOF
 
-# Create the systemd service for xtermServer
-echo "Creating systemd service for xtermServer.js..."
-cat > /etc/systemd/system/xterm-server.service <<EOF
-[Unit]
-Description=Xterm Server
-After=network.target
-
-[Service]
-ExecStart=/usr/bin/node /var/www/html/xtermServer.js
-Restart=always
-User=babyy
-Group=babyy
-WorkingDirectory=/var/www/html
-Environment=NODE_ENV=production
-StandardOutput=syslog
-StandardError=syslog
-SyslogIdentifier=xterm-server
-
-[Install]
-WantedBy=multi-user.target
-
-EOF
-
 # Reload systemd to apply the new service
 systemctl daemon-reload
 
 # Enable and start the statsPuller service
-echo "Enabling and starting the statsPuller service and the xtermServer service..."
+echo "Enabling and starting the statsPuller service..."
 systemctl enable statsPuller.service
 systemctl start statsPuller.service
 
-sudo systemctl enable xterm-server.service
-sudo systemctl start xterm-server.service
-
 echo "statsPuller service has been set up and is running."
-echo "xtermServer service has been set up and is running."
 
 # Restart NGINX service to make sure everything works
 systemctl restart nginx

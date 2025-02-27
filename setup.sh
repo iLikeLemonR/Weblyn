@@ -47,11 +47,11 @@ sudo chmod 600 /var/www/html/.env2
 sudo chown -R www-data:www-data /var/www/html/
 
 # Pull the login.html, login.php, auth.php and dashboard.html pages to the correct directory
-echo "Pulling login.html, login.php, auth.php, statsPuller.go, and dashboard.html (and all the files it needs)..."
+echo "Pulling login.html, login.php, auth.php, statsPuller.js, and dashboard.html (and all the files it needs)..."
 wget -q -O /var/www/html/login.html https://raw.githubusercontent.com/iLikeLemonR/Weblyn/refs/heads/main/Webpage/login.html
 wget -q -O /var/www/html/login.php https://raw.githubusercontent.com/iLikeLemonR/Weblyn/refs/heads/main/Webpage/login.php
 wget -q -O /var/www/html/auth.php https://raw.githubusercontent.com/iLikeLemonR/Weblyn/refs/heads/main/Webpage/auth.php
-wget -q -O /var/www/html/statsPuller.go https://raw.githubusercontent.com/iLikeLemonR/Weblyn/refs/heads/main/Webpage/statsPuller.go
+wget -q -O /var/www/html/statsPuller.js https://raw.githubusercontent.com/iLikeLemonR/Weblyn/refs/heads/main/Webpage/statsPuller.js
 wget -q -O /var/www/html/dashboard.html https://raw.githubusercontent.com/iLikeLemonR/Weblyn/refs/heads/main/Webpage/dashboard.html
 wget -q -O /var/www/html/dashcss.css https://raw.githubusercontent.com/iLikeLemonR/Weblyn/refs/heads/main/Webpage/dashcss.css
 wget -q -O /var/www/html/dashjs.js https://raw.githubusercontent.com/iLikeLemonR/Weblyn/refs/heads/main/Webpage/dashjs.js
@@ -73,8 +73,6 @@ LOCAL_IP=$(get_local_ip)
 
 # Update the index.html file dynamically with the local IP
 sed -i "s|http://localhost:8080/metrics|http://$LOCAL_IP:8080/metrics|g" /var/www/html/dashjs.js
-sed -i "s|ws://localhost:3000|ws://$LOCAL_IP:3000|g" /var/www/html/dashjs.js
-sed -i "s|ws://localhost:3000|ws://$LOCAL_IP:3000|g" /var/www/html/public/testdashjs.js
 
 # Detect installed PHP-FPM version
 PHP_FPM_SOCK=$(find /var/run/php/ -name "php*-fpm.sock" | head -n 1)
@@ -158,68 +156,22 @@ http {
 
 EOF
 
-export PATH=$PATH:/usr/local/go/bin
-export GOPATH=$HOME/go
-# Install Go if not installed
-if ! command -v go &> /dev/null; then
-    echo "Go not found. Installing Go..."
-
-    # Download the latest Go tarball
-    GO_VERSION=$(curl -s https://go.dev/dl/ | grep -oP 'go\d+\.\d+\.\d+.*\.tar\.gz' | head -n 1)
-    GO_TAR_URL="https://go.dev/dl/$GO_VERSION"
-    wget $GO_TAR_URL -P /home/$CURRENT_USER/Downloads
-
-    # Extract the tarball and install
-    tar -C /usr/local -xzf /home/$CURRENT_USER/Downloads/$GO_VERSION
-
-    # Clean up the tarball
-    rm -f /home/$CURRENT_USER/Downloads/$GO_VERSION
-
-    echo "Go has been installed."
-else
-    echo "Go is already installed."
-fi
-
-# Set up Go environment variables
-if ! grep -q "export PATH=\$PATH:/usr/local/go/bin" ~/.bashrc; then
-    echo "export PATH=\$PATH:/usr/local/go/bin" >> ~/.bashrc
-    echo "export GOPATH=\$HOME/go" >> ~/.bashrc
-    source ~/.bashrc
-    echo "Go environment variables have been set."
-else
-    echo "Go environment variables already set."
-fi
-
-# Initialize Go module in /var/www/html
-echo "Initializing Go module and using npm in /var/www/html..."
+# Initialize npm modules in /var/www/html
+echo "Initializing npm modules in /var/www/html..."
 cd /var/www/html
 npm init -y 
-npm install express node-pty ws
-go mod init statsPuller.com/statsPuller
-
-# Install Go libraries
-echo "Installing Go libraries..."
-
-# Ensure Go workspace exists
-mkdir -p "$HOME/go"
-
-# Install necessary libraries using go get
-go get github.com/shirou/gopsutil/cpu
-go get github.com/shirou/gopsutil/mem
-go get github.com/shirou/gopsutil/disk
-
-echo "Go libraries have been installed."
+npm install express node-pty ws cors systeminformation
 
 # Create the systemd service for statsPuller
-echo "Creating systemd service for statsPuller.go..."
+echo "Creating systemd service for statsPuller.js..."
 
 cat > /etc/systemd/system/statsPuller.service <<EOF
 [Unit]
-Description=Stats Puller Go Service
+Description=Stats Puller NodeJS Service
 After=network.target
 
 [Service]
-ExecStart=/usr/local/go/bin/go run /var/www/html/statsPuller.go
+ExecStart=node /var/www/html/statsPuller.js
 WorkingDirectory=/var/www/html
 User=www-data
 Restart=always

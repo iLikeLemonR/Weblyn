@@ -1,4 +1,10 @@
 <?php
+
+module.exports = {
+    //php: "/usr/bin/php"              // macOS/Ubuntu
+    php: "C:\\xampp\\php\\php.exe"   // Windows
+  }
+
 ob_start(); // Start output buffering
 
 session_start();

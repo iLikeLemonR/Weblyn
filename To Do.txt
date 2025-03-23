@@ -13,7 +13,7 @@ Easiest: Change entire dashboard look.
 11- Remote Access & SSH Management – Manage SSH keys and access settings securely.
 12- Server Hardening - Implement a script that checks and applies server hardening practices, such as disabling unnecessary services
 13- Storage & Disk Management – Mount/unmount drives, check disk health, and manage storage space.
-
+14- Usabilty stuff like total runtime and runtime from last boot, and downloadable server/device settings to send to another server using Weblyn to just paste all settings
 
 14- Combine all features of the following projects that other people made:
     - Webmin

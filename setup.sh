@@ -82,6 +82,20 @@ if [ -z "$PHP_FPM_SOCK" ]; then
     exit 1
 fi
 
+//Install PHP-FPM automatically
+
+
+
+
+
+
+
+
+
+
+
+
+
 echo "Detected PHP-FPM socket: $PHP_FPM_SOCK"
 
 # Configure NGINX

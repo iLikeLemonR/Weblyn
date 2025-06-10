@@ -82,7 +82,7 @@ if [ -z "$PHP_FPM_SOCK" ]; then
     exit 1
 fi
 
-//Install PHP-FPM automatically
+#Install PHP-FPM automatically
 
 
 

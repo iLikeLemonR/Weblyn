@@ -18,6 +18,55 @@ command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
+# Function to install required packages
+install_required_packages() {
+    print_status "Installing required packages..."
+    
+    # Check if running on a Debian-based system
+    if ! command_exists apt-get; then
+        print_error "This script requires a Debian-based system (Ubuntu, Debian, etc.)"
+        exit 1
+    fi
+    
+    # Update package lists
+    if ! apt-get update; then
+        print_error "Failed to update package lists"
+        exit 1
+    fi
+    
+    # Install required packages
+    if ! apt-get install -y \
+        nginx \
+        php7.4-fpm \
+        php7.4-mysql \
+        php7.4-redis \
+        php7.4-curl \
+        php7.4-gd \
+        php7.4-mbstring \
+        php7.4-xml \
+        php7.4-zip \
+        fail2ban \
+        curl \
+        openssl; then
+        print_error "Failed to install required packages"
+        exit 1
+    fi
+    
+    # Enable and start services
+    for service in nginx php7.4-fpm fail2ban; do
+        if ! systemctl enable "$service"; then
+            print_error "Failed to enable $service"
+            exit 1
+        fi
+        if ! systemctl start "$service"; then
+            print_error "Failed to start $service"
+            exit 1
+        fi
+    done
+    
+    print_status "Required packages installed successfully"
+}
+
 # Function to check package version
 check_package_version() {
     local package=$1
@@ -274,6 +323,9 @@ main() {
         print_error "Please run as root"
         exit 1
     fi
+    
+    # Install required packages
+    install_required_packages
     
     # Create environment files
     create_env_files

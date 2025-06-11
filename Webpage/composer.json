@@ -1,0 +1,17 @@
+{
+    "name": "weblyn/dashboard",
+    "description": "Weblyn Dashboard",
+    "type": "project",
+    "require": {
+        "php": ">=7.4",
+        "robthree/twofactorauth": "^1.8",
+        "ext-pdo": "*",
+        "ext-redis": "*",
+        "ext-json": "*"
+    },
+    "autoload": {
+        "psr-4": {
+            "Weblyn\\": "src/"
+        }
+    }
+} 

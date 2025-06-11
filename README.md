@@ -1,55 +1,111 @@
 # Weblyn
 
-🚧 **Warning: This project is incomplete and still under development!** 🚧
-
-❌ **It is currently unusable. Do not attempt to install or use it yet.** ❌
-
----
-
-## 📌 Overview
-
-**Weblyn** is a project that includes a shell script (`.sh`) designed to automate the installation and setup of a Linux-based server. It provides a secure, web-based dashboard for managing the server, monitoring system performance, and accessing all essential functionalities.
-
-✅ **Supported Distributions:** This script is designed to work on Debian-based Linux distributions, including:
-  - Ubuntu
-  - Lubuntu
-  - Other Debian-based distros
+A secure, web-based dashboard for managing your server with modern authentication and monitoring features.
 
 ## ✨ Features
 
-- 📌 **Automated Setup:** Installs and configures essential server components with a single script.
-- 🌐 **Nginx Installation:** Sets up an Nginx web server.
-- 📊 **Dashboard Interface:** A web-based UI to manage the server, including:
-  - 📂 **SFTP Access** – Easily transfer files.
-  - 💾 **Disk, Memory, and CPU Usage Monitoring** – Keep track of system resources.
-  - ⚙️ **System Settings Management** – Modify essential server configurations.
-  - 💻 **Terminal Access** – Securely access the command line from the web interface.
-- 🔑 **Secure Authentication:** Users must set login credentials during the initial setup.
-- 🚀 **Golang Backend:** Uses Go to fetch and process system data efficiently.
+- 🔐 **Secure Authentication**
+  - Database-backed user management
+  - Multi-factor authentication (MFA) support
+  - Rate limiting for login attempts
+  - Session management with Redis
+  - Password complexity requirements
 
-## 🛠️ Installation (Coming Soon)
+- 🌐 **Web Interface**
+  - Modern, responsive design
+  - Dark mode support
+  - Real-time system monitoring
+  - Secure HTTPS support (with domain)
+  - Content Security Policy (CSP) protection
 
-The installation process will be documented once the project reaches a usable state.
+- 📊 **System Monitoring**
+  - CPU usage tracking
+  - Memory utilization
+  - Disk space monitoring
+  - Real-time updates
+  - Historical data tracking
 
-## 📝 Usage (Coming Soon)
+- 🔒 **Security Features**
+  - SSL/TLS encryption (with domain)
+  - Secure session management
+  - Audit logging
+  - CSRF protection
+  - XSS protection
+  - SQL injection prevention
 
-Instructions on how to use the dashboard and its features will be provided soon.
+## 🛠️ Requirements
 
-## 📌 Disclaimer
+- Debian-based Linux distribution (Ubuntu, Debian, etc.)
+- Root access
+- Domain name (optional, but recommended for HTTPS)
 
-This project is in **active development** and is **not ready for production use**. Expect frequent changes, updates, and improvements.
+## 📥 Installation
 
-## 🛠️ Reporting Issues
+1. Clone the repository:
+```bash
+git clone https://github.com/yourusername/weblyn.git
+cd weblyn
+```
 
-If you encounter any issues or compatibility problems on different machines, please report them in the GitHub issues section. Your feedback helps improve the project!
+2. Run the setup script:
+```bash
+sudo ./setup.sh
+```
 
-## 🔧 Contributing
+3. Follow the prompts to:
+   - Configure your domain (optional)
+   - Create an admin user
+   - Set up the system
 
-Contributions are welcome! Once the base version is stable, contribution guidelines will be added.
+## 🔧 Configuration
 
-## 📜 License
+The main configuration file is located at `/var/www/html/config.php`. You can modify:
+- Database settings
+- Redis configuration
+- Session parameters
+- Security settings
+- MFA options
+- Rate limiting
+- Audit logging
 
-(Will be added once the project is finalized.)
+## 🚀 Usage
+
+1. Access the dashboard:
+   - With domain: `https://your-domain.com`
+   - Without domain: `http://localhost`
+
+2. Log in with your admin credentials
+
+3. Enable MFA (recommended):
+   - Go to your profile settings
+   - Enable MFA
+   - Scan the QR code with your authenticator app
+
+## 🧹 Uninstallation
+
+To completely remove Weblyn:
+
+```bash
+sudo ./uninstall.sh
+```
+
+Follow the prompts to remove components selectively.
+
+## 🔐 Security Notes
+
+- Change default passwords after installation
+- Enable MFA for all users
+- Keep the system updated
+- Monitor audit logs regularly
+- Use a strong domain SSL certificate
+
+## 📝 License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## ⚠️ Disclaimer
+
+This software is provided "as is", without warranty of any kind. Use at your own risk.
 
 ---
 

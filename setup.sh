@@ -41,6 +41,12 @@ check_package_version() {
         npm)
             current_version=$(npm -v | grep -oP '\d+\.\d+\.\d+')
             ;;
+        postgres)
+            current_version=$(psql --version | grep -oP '\d+\.\d+\.\d+')
+            ;;
+        redis-cli)
+            current_version=$(redis-cli --version | grep -oP '\d+\.\d+\.\d+')
+            ;;
         *)
             return 0
             ;;
@@ -62,39 +68,20 @@ fi
 # Get the current user
 CURRENT_USER=${SUDO_USER:-$(whoami)}
 
-# Create necessary directories
-print_status "Creating necessary directories..."
-mkdir -p /var/www/html
-mkdir -p /var/www/html/public
-mkdir -p /var/www/html/session_tokens
-
-# Set up environment files
-print_status "Setting up environment files..."
-touch /var/www/html/.env
-touch /var/www/html/.env2
-echo "/var/www/html/session_tokens/" > "/var/www/html/.env2"
-
-# Set proper permissions
-chmod 700 /var/www/html/session_tokens
-chmod 600 /var/www/html/.env
-chmod 600 /var/www/html/.env2
-chown -R www-data:www-data /var/www/html/
-
-# Prompt for credentials
-print_status "Setting up login credentials..."
-echo "Enter a username for the login page:"
-read USERNAME
-echo "Enter a password for the login page:"
-read -s PASSWORD
-
-# Save credentials securely
-echo "USERNAME=$USERNAME" > /var/www/html/.env
-echo "PASSWORD=$(openssl passwd -6 $PASSWORD)" >> /var/www/html/.env
-print_status "Credentials saved successfully!"
-
 # Update system
 print_status "Updating system..."
 apt-get update
+apt-get upgrade -y
+
+# Install required packages
+print_status "Installing required packages..."
+apt-get install -y nginx-full nginx-common nginx-extras \
+    php-fpm php-pgsql php-redis php-curl php-mbstring php-xml \
+    postgresql postgresql-contrib \
+    redis-server \
+    nodejs npm \
+    composer \
+    certbot python3-certbot-nginx
 
 # Check and install NGINX if needed
 if ! check_package_version nginx "1.18.0"; then
@@ -107,87 +94,139 @@ fi
 # Check and install PHP-FPM if needed
 if ! check_package_version php "7.4.0"; then
     print_status "Installing/Updating PHP-FPM..."
-    apt-get install -y php-fpm
+    apt-get install -y php-fpm php-pgsql php-redis php-curl php-mbstring php-xml
 else
     print_status "PHP-FPM is already installed and up to date."
 fi
 
-# Check and install Node.js if needed
-if ! check_package_version node "14.0.0"; then
-    print_status "Installing/Updating Node.js..."
-    apt-get install -y nodejs
+# Check and install PostgreSQL if needed
+if ! check_package_version postgres "12.0"; then
+    print_status "Installing/Updating PostgreSQL..."
+    apt-get install -y postgresql postgresql-contrib
 else
-    print_status "Node.js is already installed and up to date."
+    print_status "PostgreSQL is already installed and up to date."
 fi
 
-# Check and install npm if needed
-if ! check_package_version npm "6.0.0"; then
-    print_status "Installing/Updating npm..."
-    apt-get install -y npm
+# Check and install Redis if needed
+if ! check_package_version redis-cli "6.0.0"; then
+    print_status "Installing/Updating Redis..."
+    apt-get install -y redis-server
 else
-    print_status "npm is already installed and up to date."
+    print_status "Redis is already installed and up to date."
 fi
 
-# Install Node.js dependencies if needed
-print_status "Checking Node.js dependencies..."
-if [ ! -f "/var/www/html/package.json" ] || [ ! -d "/var/www/html/node_modules" ]; then
-    print_status "Installing Node.js dependencies..."
-    cd /var/www/html
-    npm init -y
-    npm install express node-pty ws cors systeminformation express-rate-limit
-else
-    print_status "Node.js dependencies are already installed."
-fi
+# Configure PostgreSQL
+print_status "Configuring PostgreSQL..."
+sudo -u postgres psql -c "CREATE DATABASE weblyn;"
+sudo -u postgres psql -c "CREATE USER weblyn_user WITH ENCRYPTED PASSWORD 'weblyn_password';"
+sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE weblyn TO weblyn_user;"
 
-# Download web files if they don't exist
-print_status "Checking web files..."
-WEB_FILES=(
-    "login.html"
-    "login.php"
-    "auth.php"
-    "statsPuller.js"
-    "dashboard.html"
-    "dashcss.css"
-    "dashjs.js"
-)
+# Import database schema
+print_status "Importing database schema..."
+sudo -u postgres psql weblyn < /var/www/html/schema.sql
 
-for file in "${WEB_FILES[@]}"; do
-    if [ ! -f "/var/www/html/$file" ]; then
-        print_status "Downloading $file..."
-        wget -q -O "/var/www/html/$file" "https://raw.githubusercontent.com/iLikeLemonR/Weblyn/refs/heads/main/Webpage/$file"
-    else
-        print_status "$file already exists."
-    fi
-done
+# Configure Redis
+print_status "Configuring Redis..."
+sed -i 's/# requirepass foobared/requirepass weblyn_redis_password/' /etc/redis/redis.conf
+systemctl restart redis-server
 
-# Configure NGINX if needed
-print_status "Checking NGINX configuration..."
-if [ ! -f "/etc/nginx/sites-available/default" ]; then
-    print_status "Configuring NGINX..."
-    NGINX_CONFIG="/etc/nginx/sites-available/default"
+# Create necessary directories
+print_status "Creating necessary directories..."
+mkdir -p /var/www/html
+mkdir -p /var/www/html/public
+mkdir -p /var/log/weblyn
+chmod 755 /var/log/weblyn
 
-    # Detect PHP-FPM socket
-    PHP_FPM_SOCK=$(find /var/run/php/ -name "php*-fpm.sock" | head -n 1)
+# Set up environment files
+print_status "Setting up environment files..."
+cat > /var/www/html/config.php << 'EOL'
+<?php
+// Database configuration
+define('DB_HOST', 'localhost');
+define('DB_NAME', 'weblyn');
+define('DB_USER', 'weblyn_user');
+define('DB_PASS', 'weblyn_password');
 
-    if [ -z "$PHP_FPM_SOCK" ]; then
-        print_error "PHP-FPM is not installed or running. Please install PHP-FPM and try again."
-        exit 1
-    fi
+// Redis configuration
+define('REDIS_HOST', 'localhost');
+define('REDIS_PORT', 6379);
+define('REDIS_PASS', 'weblyn_redis_password');
 
-    # Create NGINX configuration
-    cat > $NGINX_CONFIG <<EOF
+// Session configuration
+define('SESSION_LIFETIME', 3600); // 1 hour
+define('SESSION_REFRESH_TIME', 300); // 5 minutes
+define('SESSION_NAME', 'weblyn_session');
+
+// Security configuration
+define('PASSWORD_MIN_LENGTH', 12);
+define('PASSWORD_REQUIRE_SPECIAL', true);
+define('PASSWORD_REQUIRE_NUMBERS', true);
+define('PASSWORD_REQUIRE_UPPERCASE', true);
+define('PASSWORD_REQUIRE_LOWERCASE', true);
+
+// Rate limiting
+define('LOGIN_ATTEMPTS_LIMIT', 5);
+define('LOGIN_ATTEMPTS_WINDOW', 300); // 5 minutes
+
+// MFA configuration
+define('MFA_ENABLED', true);
+define('MFA_ISSUER', 'Weblyn');
+define('MFA_ALGORITHM', 'sha1');
+define('MFA_DIGITS', 6);
+define('MFA_PERIOD', 30);
+
+// CSP configuration
+define('CSP_ENABLED', true);
+define('CSP_REPORT_URI', '/csp-report.php');
+
+// Audit logging
+define('AUDIT_LOG_ENABLED', true);
+define('AUDIT_LOG_PATH', '/var/log/weblyn/audit.log');
+EOL
+
+# Install PHP dependencies
+print_status "Installing PHP dependencies..."
+cd /var/www/html
+composer require robthree/twofactorauth
+
+# Configure NGINX
+print_status "Configuring NGINX..."
+read -p "Do you have a domain name? (y/N): " HAS_DOMAIN
+
+if [[ $HAS_DOMAIN =~ ^[Yy]$ ]]; then
+    read -p "Enter your domain name: " DOMAIN_NAME
+    cat > /etc/nginx/sites-available/default << EOL
 server {
     listen 80;
-    server_name localhost;
+    server_name $DOMAIN_NAME;
+    return 301 https://\$host\$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name $DOMAIN_NAME;
+
+    ssl_certificate /etc/letsencrypt/live/$DOMAIN_NAME/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/$DOMAIN_NAME/privkey.pem;
+    ssl_session_timeout 1d;
+    ssl_session_cache shared:SSL:50m;
+    ssl_session_tickets off;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
+    ssl_prefer_server_ciphers off;
+
+    # HSTS (uncomment if you're sure)
+    # add_header Strict-Transport-Security "max-age=63072000" always;
 
     root /var/www/html;
     index login.html;
 
     # Security headers
-    add_header X-Frame-Options "SAMEORIGIN";
-    add_header X-XSS-Protection "1; mode=block";
-    add_header X-Content-Type-Options "nosniff";
-    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "no-referrer-when-downgrade" always;
+    add_header Content-Security-Policy "default-src 'self' http: https: data: blob: 'unsafe-inline'" always;
 
     location / {
         try_files \$uri \$uri/ =404;
@@ -195,71 +234,109 @@ server {
 
     location /dashboard.html {
         auth_request /auth.php;
+        auth_request_set \$auth_resp_jwt \$upstream_http_authorization;
+        add_header Authorization \$auth_resp_jwt;
     }
 
     location /auth.php {
         internal;
-        fastcgi_pass unix:$PHP_FPM_SOCK;
+        fastcgi_pass unix:/var/run/php/php-fpm.sock;
         fastcgi_param SCRIPT_FILENAME /var/www/html/auth.php;
         include fastcgi_params;
     }
 
-    location /metrics {
-        proxy_pass http://localhost:8080/metrics;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host \$host;
-        proxy_cache_bypass \$http_upgrade;
+    location ~ \.php$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/var/run/php/php-fpm.sock;
     }
 
-    location ~ \.php\$ {
-        include snippets/fastcgi-php.conf;
-        fastcgi_pass unix:$PHP_FPM_SOCK;
+    location ~ /\.ht {
+        deny all;
     }
 }
-EOF
+EOL
+
+    # Get SSL certificate
+    print_status "Setting up SSL certificate..."
+    certbot --nginx -d $DOMAIN_NAME --non-interactive --agree-tos --email admin@$DOMAIN_NAME
 else
-    print_status "NGINX configuration already exists."
+    cat > /etc/nginx/sites-available/default << EOL
+server {
+    listen 80;
+    server_name _;
+
+    root /var/www/html;
+    index login.html;
+
+    # Security headers
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "no-referrer-when-downgrade" always;
+    add_header Content-Security-Policy "default-src 'self' http: https: data: blob: 'unsafe-inline'" always;
+
+    location / {
+        try_files \$uri \$uri/ =404;
+    }
+
+    location /dashboard.html {
+        auth_request /auth.php;
+        auth_request_set \$auth_resp_jwt \$upstream_http_authorization;
+        add_header Authorization \$auth_resp_jwt;
+    }
+
+    location /auth.php {
+        internal;
+        fastcgi_pass unix:/var/run/php/php-fpm.sock;
+        fastcgi_param SCRIPT_FILENAME /var/www/html/auth.php;
+        include fastcgi_params;
+    }
+
+    location ~ \.php$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/var/run/php/php-fpm.sock;
+    }
+
+    location ~ /\.ht {
+        deny all;
+    }
+}
+EOL
+    DOMAIN_NAME="localhost"
 fi
 
-# Create systemd service for statsPuller if needed
-print_status "Checking statsPuller service..."
-if [ ! -f "/etc/systemd/system/statsPuller.service" ]; then
-    print_status "Creating systemd service for statsPuller..."
-    cat > /etc/systemd/system/statsPuller.service <<EOF
-[Unit]
-Description=Stats Puller NodeJS Service
-After=network.target
-
-[Service]
-ExecStart=node /var/www/html/statsPuller.js
-WorkingDirectory=/var/www/html
-User=www-data
-Restart=always
-Environment=NODE_ENV=production
-
-[Install]
-WantedBy=multi-user.target
-EOF
-else
-    print_status "statsPuller service already exists."
-fi
-
-# Reload systemd and start services
-print_status "Starting services..."
-systemctl daemon-reload
-systemctl enable statsPuller.service
-systemctl start statsPuller.service
+# Restart services
+print_status "Restarting services..."
 systemctl restart nginx
+systemctl restart php-fpm
+systemctl restart postgresql
+systemctl restart redis-server
 
-# Verify services are running
-if systemctl is-active --quiet nginx && systemctl is-active --quiet statsPuller.service; then
-    print_status "All services are running successfully!"
-else
-    print_error "One or more services failed to start. Please check the logs."
-    exit 1
-fi
+# Set proper permissions
+print_status "Setting proper permissions..."
+chown -R www-data:www-data /var/www/html
+chmod -R 755 /var/www/html
+chmod 600 /var/www/html/config.php
+
+# Create initial admin user
+print_status "Creating initial admin user..."
+read -p "Enter admin username: " ADMIN_USER
+read -s -p "Enter admin password: " ADMIN_PASS
+echo
+
+# Hash the password
+ADMIN_PASS_HASH=$(php -r "echo password_hash('$ADMIN_PASS', PASSWORD_DEFAULT);")
+
+# Insert admin user into database
+sudo -u postgres psql weblyn << EOF
+INSERT INTO users (username, password_hash, email, mfa_enabled, is_active)
+VALUES ('$ADMIN_USER', '$ADMIN_PASS_HASH', 'admin@$DOMAIN_NAME', false, true);
+EOF
 
 print_status "Setup completed successfully!"
-print_status "You can now access the dashboard at http://localhost"
+if [[ $HAS_DOMAIN =~ ^[Yy]$ ]]; then
+    print_status "You can now access your dashboard at https://$DOMAIN_NAME"
+else
+    print_status "You can now access your dashboard at http://localhost"
+fi
+print_status "Please make sure to change the default passwords in config.php"

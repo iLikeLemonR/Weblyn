@@ -13,10 +13,13 @@
         body.dark-mode .form-control {
             background-color: #333;
             color: #fff;
+            border-color: #444;
         }
         body.dark-mode .form-control:focus {
             background-color: #333;
             color: #fff;
+            border-color: #007bff;
+            box-shadow: 0 0 0 0.25rem rgba(0, 123, 255, 0.25);
         }
         body.dark-mode .btn-primary {
             background-color: #007bff;
@@ -26,22 +29,92 @@
             background-color: #0056b3;
             border-color: #0056b3;
         }
+        .login-container {
+            max-width: 400px;
+            margin: 100px auto;
+            padding: 30px;
+            background: rgba(33, 33, 33, 0.9);
+            border-radius: 15px;
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.5);
+        }
+        .form-floating {
+            margin-bottom: 1rem;
+        }
+        .form-floating > .form-control {
+            padding: 1rem 0.75rem;
+        }
+        .alert {
+            margin-bottom: 1rem;
+        }
+        .mfa-section {
+            display: none;
+            margin-top: 1rem;
+        }
+        .mfa-section.active {
+            display: block;
+        }
     </style>
 </head>
 <body class="dark-mode">
-    <div class="container my-5">
-        <h2 class="text-center">Login</h2>
-        <form action="login.php" method="POST">
-            <div class="mb-3">
-                <label for="username" class="form-label">Username</label>
-                <input type="text" class="form-control" id="username" name="username" required>
-            </div>
-            <div class="mb-3">
-                <label for="password" class="form-label">Password</label>
-                <input type="password" class="form-control" id="password" name="password" required>
-            </div>
-            <button type="submit" class="btn btn-primary w-100">Login</button>
-        </form>
+    <div class="container">
+        <div class="login-container">
+            <h2 class="text-center mb-4">Login</h2>
+            <form action="login.php" method="POST" id="loginForm">
+                <div class="form-floating">
+                    <input type="text" class="form-control" id="username" name="username" placeholder="Username" required>
+                    <label for="username">Username</label>
+                </div>
+                <div class="form-floating">
+                    <input type="password" class="form-control" id="password" name="password" placeholder="Password" required>
+                    <label for="password">Password</label>
+                </div>
+                <div class="mfa-section" id="mfaSection">
+                    <div class="form-floating">
+                        <input type="text" class="form-control" id="mfa_code" name="mfa_code" placeholder="MFA Code" pattern="[0-9]{6}" maxlength="6">
+                        <label for="mfa_code">MFA Code</label>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary w-100">Login</button>
+            </form>
+            <div class="success-message" id="successMessage"></div>
+            <p style="text-align: center; margin-top: 15px;">
+                Don't have an account? <a href="signup.html">Sign up here</a>
+            </p>
+        </div>
     </div>
+
+    <script>
+        document.getElementById('loginForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const response = await fetch('login.php', {
+                method: 'POST',
+                body: formData
+            });
+            
+            const data = await response.text();
+            
+            if (response.ok) {
+                window.location.href = '/dashboard.html';
+            } else {
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'alert alert-danger';
+                errorDiv.textContent = data;
+                
+                const existingAlert = document.querySelector('.alert');
+                if (existingAlert) {
+                    existingAlert.remove();
+                }
+                
+                this.insertBefore(errorDiv, this.firstChild);
+                
+                // Show MFA section if needed
+                if (data.includes('MFA code required')) {
+                    document.getElementById('mfaSection').classList.add('active');
+                }
+            }
+        });
+    </script>
 </body>
 </html>

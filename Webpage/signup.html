@@ -52,6 +52,7 @@
     <div class="signup-container">
         <h2>Create Account</h2>
         <form id="signupForm" onsubmit="return handleSignup(event)">
+            <input type="hidden" id="csrf_token" name="csrf_token" value="">
             <div class="form-group">
                 <label for="username">Username</label>
                 <input type="text" id="username" name="username" required
@@ -89,6 +90,15 @@
     </div>
 
     <script>
+        // Fetch CSRF token on page load
+        fetch('login.php?get_csrf_token=1')
+            .then(response => response.json())
+            .then(data => {
+                if (data.csrf_token) {
+                    document.getElementById('csrf_token').value = data.csrf_token;
+                }
+            });
+
         function validateForm() {
             let isValid = true;
             const username = document.getElementById('username');
@@ -140,7 +150,8 @@
             const formData = {
                 username: document.getElementById('username').value,
                 email: document.getElementById('email').value,
-                password: document.getElementById('password').value
+                password: document.getElementById('password').value,
+                csrf_token: document.getElementById('csrf_token').value
             };
             
             try {

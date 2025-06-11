@@ -4,6 +4,12 @@ require_once 'Auth.php';
 
 header('Content-Type: application/json');
 
+// CSRF protection utility
+function validate_csrf_token($token) {
+    session_start();
+    return isset($_SESSION['csrf_token']) && hash_equals($_SESSION['csrf_token'], $token);
+}
+
 // Only allow POST requests
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
@@ -14,11 +20,20 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 // Get JSON input
 $input = json_decode(file_get_contents('php://input'), true);
 
-if (!$input || !isset($input['username']) || !isset($input['email']) || !isset($input['password'])) {
+if (!$input || !isset($input['username']) || !isset($input['email']) || !isset($input['password']) || !isset($input['csrf_token'])) {
     http_response_code(400);
     echo json_encode(['success' => false, 'message' => 'Missing required fields']);
     exit;
 }
+
+// Validate CSRF token
+if (!validate_csrf_token($input['csrf_token'])) {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Invalid CSRF token']);
+    exit;
+}
+
+$config = require 'config.php';
 
 try {
     $pdo = new PDO(

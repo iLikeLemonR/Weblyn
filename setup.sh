@@ -358,7 +358,6 @@ download_and_setup_files() {
     download_file "${BASE_URL}/Webpage/dashboard.html" "/var/www/html/public/dashboard.html"
     download_file "${BASE_URL}/Webpage/login.html" "/var/www/html/public/login.html"
     download_file "${BASE_URL}/Webpage/signup.html" "/var/www/html/public/signup.html"
-    download_file "${BASE_URL}/Webpage/index.html" "/var/www/html/public/index.html"
     
     # PHP files
     print_status "Installing PHP files..."

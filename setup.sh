@@ -52,17 +52,28 @@ install_required_packages() {
         exit 1
     fi
     
-    # Enable and start services
-    for service in nginx php7.4-fpm fail2ban; do
-        if ! systemctl enable "$service"; then
-            print_error "Failed to enable $service"
-            exit 1
-        fi
-        if ! systemctl start "$service"; then
-            print_error "Failed to start $service"
-            exit 1
-        fi
-    done
+    # Check if system is using systemd
+    if command_exists systemctl; then
+        # Enable and start services using systemd
+        for service in nginx php7.4-fpm fail2ban; do
+            if ! systemctl enable "$service"; then
+                print_error "Failed to enable $service"
+                exit 1
+            fi
+            if ! systemctl start "$service"; then
+                print_error "Failed to start $service"
+                exit 1
+            fi
+        done
+    else
+        # Use service command for non-systemd systems
+        for service in nginx php7.4-fpm fail2ban; do
+            if ! service "$service" start; then
+                print_error "Failed to start $service"
+                exit 1
+            fi
+        done
+    fi
     
     print_status "Required packages installed successfully"
 }

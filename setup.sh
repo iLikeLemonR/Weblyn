@@ -361,12 +361,12 @@ download_and_setup_files() {
     
     # PHP files
     print_status "Installing PHP files..."
-    download_file "${BASE_URL}/auth.php" "/var/www/html/auth.php"
-    download_file "${BASE_URL}/signup.php" "/var/www/html/signup.php"
-    download_file "${BASE_URL}/login.php" "/var/www/html/login.php"
-    download_file "${BASE_URL}/dashboard.php" "/var/www/html/dashboard.php"
-    download_file "${BASE_URL}/csp-report.php" "/var/www/html/csp-report.php"
-    download_file "${BASE_URL}/api.php" "/var/www/html/api.php"
+    download_file "${BASE_URL}/Webpage/auth.php" "/var/www/html/auth.php"
+    download_file "${BASE_URL}/Webpage/signup.php" "/var/www/html/signup.php"
+    download_file "${BASE_URL}/Webpage/login.php" "/var/www/html/login.php"
+    download_file "${BASE_URL}/Webpage/dashboard.php" "/var/www/html/dashboard.php"
+    download_file "${BASE_URL}/Webpage/csp-report.php" "/var/www/html/csp-report.php"
+    download_file "${BASE_URL}/Webpage/api.php" "/var/www/html/api.php"
     
     # CSS files
     print_status "Installing CSS files..."

@@ -18,6 +18,11 @@ command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
+# Function to get latest PHP version from apt
+get_latest_php_version() {
+    apt-cache search php | grep -E '^php[0-9]+\.[0-9]+-fpm' | sort -V | tail -n1 | cut -d' ' -f1 | cut -d'-' -f1
+}
+
 # Function to install required packages
 install_required_packages() {
     print_status "Installing required packages..."
@@ -34,17 +39,26 @@ install_required_packages() {
         exit 1
     fi
     
+    # Get latest PHP version
+    PHP_VERSION=$(get_latest_php_version)
+    if [ -z "$PHP_VERSION" ]; then
+        print_error "Could not determine latest PHP version"
+        exit 1
+    fi
+    
+    print_status "Detected PHP version: $PHP_VERSION"
+    
     # Install required packages
     if ! apt-get install -y \
         nginx \
-        php7.4-fpm \
-        php7.4-mysql \
-        php7.4-redis \
-        php7.4-curl \
-        php7.4-gd \
-        php7.4-mbstring \
-        php7.4-xml \
-        php7.4-zip \
+        "$PHP_VERSION-fpm" \
+        "$PHP_VERSION-mysql" \
+        "$PHP_VERSION-redis" \
+        "$PHP_VERSION-curl" \
+        "$PHP_VERSION-gd" \
+        "$PHP_VERSION-mbstring" \
+        "$PHP_VERSION-xml" \
+        "$PHP_VERSION-zip" \
         fail2ban \
         curl \
         openssl; then
@@ -55,7 +69,7 @@ install_required_packages() {
     # Check if system is using systemd
     if command_exists systemctl; then
         # Enable and start services using systemd
-        for service in nginx php7.4-fpm fail2ban; do
+        for service in nginx "${PHP_VERSION}-fpm" fail2ban; do
             if ! systemctl enable "$service"; then
                 print_error "Failed to enable $service"
                 exit 1
@@ -67,7 +81,7 @@ install_required_packages() {
         done
     else
         # Use service command for non-systemd systems
-        for service in nginx php7.4-fpm fail2ban; do
+        for service in nginx "${PHP_VERSION}-fpm" fail2ban; do
             if ! service "$service" start; then
                 print_error "Failed to start $service"
                 exit 1
@@ -211,8 +225,15 @@ EOL
 configure_security() {
     print_status "Configuring security settings..."
     
+    # Get PHP version
+    PHP_VERSION=$(get_latest_php_version)
+    if [ -z "$PHP_VERSION" ]; then
+        print_error "Could not determine PHP version"
+        exit 1
+    fi
+    
     # Configure PHP security
-    cat > /etc/php/7.4/fpm/conf.d/99-security.ini << 'EOL'
+    cat > "/etc/php/${PHP_VERSION#php}/fpm/conf.d/99-security.ini" << 'EOL'
 expose_php = Off
 display_errors = Off
 display_startup_errors = Off
@@ -280,9 +301,15 @@ logpath = /var/log/weblyn/error.log
 EOL
 
     # Restart services
-    systemctl restart php7.4-fpm
-    systemctl restart nginx
-    systemctl restart fail2ban
+    if command_exists systemctl; then
+        systemctl restart "${PHP_VERSION}-fpm"
+        systemctl restart nginx
+        systemctl restart fail2ban
+    else
+        service "${PHP_VERSION}-fpm" restart
+        service nginx restart
+        service fail2ban restart
+    fi
 }
 
 # Function to download and setup files

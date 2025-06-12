@@ -104,7 +104,7 @@ server {
     # Serve static files and HTML from /public
     location ~* ^/(.*\.(css|js|html))$ {
         alias /var/www/html/public/$1;
-        try_files $uri $1 =404;
+        try_files $1 =404;
     }
 
     # Serve static files from /public (for direct /public/ access)

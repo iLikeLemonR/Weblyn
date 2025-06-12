@@ -110,32 +110,41 @@ install_nodejs() {
     return 0
 }
 
-# Function to install PHP and required extensions
+# Function to install PHP
 install_php() {
-    print_status "Installing PHP and required extensions..."
+    print_status "Installing PHP..."
     
     # Check if PHP is already installed
     if command_exists php; then
-        current_version=$(php -v | grep -oP '\d+\.\d+\.\d+')
-        if check_package_version php "7.4.0"; then
-            print_status "PHP $current_version is already installed and compatible"
-            return 0
+        PHP_VERSION=$(php -r 'echo PHP_VERSION;')
+        print_status "PHP $PHP_VERSION is already installed"
+        
+        # Check if version is at least 7.4
+        if [[ $(php -r 'echo version_compare(PHP_VERSION, "7.4", ">=") ? "yes" : "no";') == "no" ]]; then
+            print_warning "PHP version $PHP_VERSION is lower than required (7.4+). Upgrading..."
         else
-            print_warning "PHP $current_version is installed but needs update"
+            print_status "PHP version $PHP_VERSION meets requirements"
+            return 0
         fi
     fi
-
-    # Add PHP repository
-    add-apt-repository -y ppa:ondrej/php
     
-    # Install PHP and required extensions
-    if ! apt-get install -y php8.1-fpm php8.1-pgsql php8.1-redis php8.1-curl \
-        php8.1-gd php8.1-mbstring php8.1-xml php8.1-zip php8.1-json; then
-        print_error "Failed to install PHP and extensions"
-        return 1
-    fi
-
-    print_status "PHP and extensions installed successfully"
+    # Add repository for PHP 8.1
+    add-apt-repository -y ppa:ondrej/php
+    apt-get update
+    
+    # Install PHP 8.1 and required extensions
+    apt-get install -y php8.1 php8.1-fpm php8.1-cli php8.1-common php8.1-pgsql php8.1-redis \
+        php8.1-curl php8.1-mbstring php8.1-xml php8.1-zip php8.1-gd
+    
+    # Note: php8.1-json is now included in the core PHP package since PHP 8.0
+    
+    # Configure PHP
+    configure_php
+    
+    # Restart PHP-FPM
+    systemctl restart php8.1-fpm
+    
+    print_status "PHP 8.1 installed successfully"
     return 0
 }
 

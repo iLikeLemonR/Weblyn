@@ -37,6 +37,90 @@ fix_nginx_security_conf() {
     fi
 }
 
+# Function to write default nginx configuration
+write_default_nginx_config() {
+    print_status "Writing default nginx configuration..."
+    cat > /etc/nginx/nginx.conf <<EOL
+user www-data;
+worker_processes auto;
+pid /run/nginx.pid;
+include /etc/nginx/modules-enabled/*.conf;
+
+events {
+    worker_connections 768;
+}
+
+http {
+    sendfile on;
+    tcp_nopush on;
+    tcp_nodelay on;
+    keepalive_timeout 65;
+    types_hash_max_size 2048;
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+    access_log /var/log/nginx/access.log;
+    error_log /var/log/nginx/error.log;
+    gzip on;
+    include /etc/nginx/conf.d/*.conf;
+    include /etc/nginx/sites-enabled/*;
+}
+EOL
+    
+    # Default site config
+    mkdir -p /etc/nginx/sites-available /etc/nginx/sites-enabled
+    cat > /etc/nginx/sites-available/default <<EOL
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    root /var/www/html;
+    index index.html index.htm index.php;
+    server_name _;
+    location / {
+        try_files $uri $uri/ =404;
+    }
+    location ~ \.php$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/var/run/php/php-fpm.sock;
+    }
+    location ~ /\.ht {
+        deny all;
+    }
+}
+EOL
+    ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default
+}
+
+# Function to overwrite nginx security.conf with secure settings
+write_nginx_security_conf() {
+    print_status "Writing secure nginx security.conf..."
+    cat > /etc/nginx/conf.d/security.conf <<EOL
+server {
+    # Security headers
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self';" always;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
+
+    # Disable server tokens
+    server_tokens off;
+
+    # Prevent access to hidden files
+    location ~ /\. {
+        deny all;
+        access_log off;
+        log_not_found off;
+    }
+
+    # Prevent access to sensitive files
+    location ~* \. (env|log|git|svn|htaccess|htpasswd|ini|phps|fla|psd|sh|sql|json)$ {
+        deny all;
+    }
+}
+EOL
+}
+
 # Function to install required packages
 install_required_packages() {
     print_status "Installing required packages..."
@@ -80,8 +164,6 @@ install_required_packages() {
         exit 1
     fi
     
-    # Always fix nginx security.conf before starting services
-    fix_nginx_security_conf
     # Test nginx config before starting
     if ! nginx -t; then
         print_error "Nginx configuration test failed. Please check /etc/nginx/conf.d/security.conf."
@@ -392,10 +474,14 @@ main() {
     # Install required packages
     install_required_packages
     
+    # Write default nginx config and secure security.conf
+    write_default_nginx_config
+    write_nginx_security_conf
+    
     # Create environment files
     create_env_files
     
-    # Configure security
+    # Configure PHP and fail2ban security
     configure_security
     
     # Download and setup files

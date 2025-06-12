@@ -23,6 +23,20 @@ get_latest_php_version() {
     apt-cache search php | grep -E '^php[0-9]+\.[0-9]+-fpm' | sort -V | tail -n1 | cut -d' ' -f1 | cut -d'-' -f1
 }
 
+# Function to fix nginx security.conf if location is outside server block
+fix_nginx_security_conf() {
+    local conf_file="/etc/nginx/conf.d/security.conf"
+    if [ -f "$conf_file" ]; then
+        # Check if there is a location block outside a server block
+        if grep -qE '^[[:space:]]*location\\b' "$conf_file" && ! grep -qE '^[[:space:]]*server\\b' "$conf_file"; then
+            print_status "Automatically fixing $conf_file: Wrapping in server block."
+            cp "$conf_file" "$conf_file.bak"
+            { echo "server {"; cat "$conf_file"; echo "}"; } > "${conf_file}.tmp"
+            mv "${conf_file}.tmp" "$conf_file"
+        fi
+    fi
+}
+
 # Function to install required packages
 install_required_packages() {
     print_status "Installing required packages..."
@@ -63,6 +77,14 @@ install_required_packages() {
         curl \
         openssl; then
         print_error "Failed to install required packages"
+        exit 1
+    fi
+    
+    # Always fix nginx security.conf before starting services
+    fix_nginx_security_conf
+    # Test nginx config before starting
+    if ! nginx -t; then
+        print_error "Nginx configuration test failed. Please check /etc/nginx/conf.d/security.conf."
         exit 1
     fi
     

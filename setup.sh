@@ -1,279 +1,34 @@
 #!/bin/bash
 
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
 # Exit on error
 set -e
 
 # Function to print colored status messages
 print_status() {
-    echo -e "\e[1;34m==>\e[0m \e[1m$1\e[0m"
+    echo -e "${BLUE}==>${NC} ${GREEN}$1${NC}"
 }
 
 # Function to print error messages
 print_error() {
-    echo -e "\e[1;31mError:\e[0m $1" >&2
+    echo -e "${RED}Error:${NC} $1" >&2
+}
+
+# Function to print warning messages
+print_warning() {
+    echo -e "${YELLOW}Warning:${NC} $1"
 }
 
 # Function to check if a command exists
 command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
-
-# Function to get latest PHP version from apt
-get_latest_php_version() {
-    apt-cache search php | grep -E '^php[0-9]+\.[0-9]+-fpm' | sort -V | tail -n1 | cut -d' ' -f1 | cut -d'-' -f1
-}
-
-# Function to fix nginx security.conf if location is outside server block
-fix_nginx_security_conf() {
-    local conf_file="/etc/nginx/conf.d/security.conf"
-    if [ -f "$conf_file" ]; then
-        # Check if there is a location block outside a server block
-        if grep -qE '^[[:space:]]*location\\b' "$conf_file" && ! grep -qE '^[[:space:]]*server\\b' "$conf_file"; then
-            print_status "Automatically fixing $conf_file: Wrapping in server block."
-            cp "$conf_file" "$conf_file.bak"
-            { echo "server {"; cat "$conf_file"; echo "}"; } > "${conf_file}.tmp"
-            mv "${conf_file}.tmp" "$conf_file"
-        fi
-    fi
-}
-
-# Function to write default nginx configuration
-write_default_nginx_config() {
-    print_status "Writing default nginx configuration..."
-    
-    # Main nginx.conf
-    cat > /etc/nginx/nginx.conf <<EOL
-user www-data;
-worker_processes auto;
-pid /run/nginx.pid;
-
-include /etc/nginx/modules-enabled/*.conf;
-
-events {
-    worker_connections 1024;
-    multi_accept on;
-}
-
-http {
-    sendfile on;
-    tcp_nopush on;
-    tcp_nodelay on;
-    keepalive_timeout 65;
-    types_hash_max_size 4096;
-
-    include /etc/nginx/mime.types;
-    default_type application/octet-stream;
-
-    server_tokens off;
-
-    # Logging
-    access_log /var/log/nginx/access.log;
-    error_log /var/log/nginx/error.log;
-
-    # Gzip compression
-    gzip on;
-    gzip_vary on;
-    gzip_proxied any;
-    gzip_comp_level 6;
-    gzip_types text/plain text/css text/xml application/json application/javascript application/xml+rss application/atom+xml image/svg+xml;
-
-    # Security headers (applied globally)
-    add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header X-XSS-Protection "1; mode=block" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self';" always;
-    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
-
-    # File upload limit (optional)
-    client_max_body_size 10M;
-
-    # FastCGI timeout tuning (optional for PHP apps)
-    fastcgi_read_timeout 60;
-
-    # Include additional configs
-    include /etc/nginx/conf.d/*.conf;
-    include /etc/nginx/sites-enabled/*;
-}
-EOL
-
-
-    # Default site configuration
-    mkdir -p /etc/nginx/sites-available /etc/nginx/sites-enabled
-    cat > /etc/nginx/sites-available/default <<EOL
-server {
-    listen 80 default_server;
-    listen [::]:80 default_server;
-    server_name _;
-
-    root /var/www/html;
-    index login.html;
-
-    # Serve static files and HTML from /public
-    location /public/ {
-        alias /var/www/html/public/;
-        try_files $uri $uri/ =404;
-    }
-
-    # Admin PHP endpoints
-    location ~ ^/admin/(.*\.php)$ {
-        alias /var/www/html/admin/$1;
-        include snippets/fastcgi-php.conf;
-        fastcgi_pass unix:/var/run/php/php-fpm.sock;
-        fastcgi_param SCRIPT_FILENAME /var/www/html/admin/$1;
-    }
-
-    # Main PHP endpoints (api.php, auth.php, etc.)
-    location ~ ^/(api|auth|config|csp-report|login|signup)\.php$ {
-        include snippets/fastcgi-php.conf;
-        fastcgi_pass unix:/var/run/php/php-fpm.sock;
-        fastcgi_param SCRIPT_FILENAME /var/www/html/$fastcgi_script_name;
-    }
-
-    # Default route: serve login.html
-    location / {
-        try_files /public/login.html =404;
-    }
-
-    # Security: deny access to hidden and sensitive files
-    location ~ /\. {
-        deny all;
-        access_log off;
-        log_not_found off;
-    }
-    location ~* \.(env|log|git|svn|htaccess|htpasswd|ini|phps|fla|psd|sh|sql|json|bak|backup|old|swp|tmp)$ {
-        deny all;
-    }
-}
-EOL
-
-    # Create symbolic link
-    ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default
-
-    # Create log directory
-    mkdir -p /var/log/nginx
-    chown -R www-data:www-data /var/log/nginx
-
-    # Test configuration
-    nginx -t
-}
-
-# Function to overwrite nginx security.conf with secure settings
-write_nginx_security_conf() {
-    print_status "Writing secure nginx security.conf..."
-    cat > /etc/nginx/conf.d/security.conf <<EOL
-server {
-    # Security headers
-    add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header X-XSS-Protection "1; mode=block" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self';" always;
-    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
-
-    # Disable server tokens
-    server_tokens off;
-
-    # Prevent access to hidden files
-    location ~ /\. {
-        deny all;
-        access_log off;
-        log_not_found off;
-    }
-
-    # Prevent access to sensitive files
-    location ~* \.(env|log|git|svn|htaccess|htpasswd|ini|phps|fla|psd|sh|sql|json)$ {
-        deny all;
-    }
-}
-EOL
-}
-
-# Function to install required packages
-install_required_packages() {
-    print_status "Installing required packages..."
-    
-    # Check if running on a Debian-based system
-    if ! command_exists apt-get; then
-        print_error "This script requires a Debian-based system (Ubuntu, Debian, etc.)"
-        exit 1
-    fi
-    
-    # Update package lists
-    if ! apt-get update; then
-        print_error "Failed to update package lists"
-        exit 1
-    fi
-    
-    # Get latest PHP version
-PHP_VERSION=$(get_latest_php_version)
-if [ -z "$PHP_VERSION" ]; then
-    print_error "Could not determine latest PHP version"
-    exit 1
-fi
-
-print_status "Detected PHP version: $PHP_VERSION"
-
-# Prevent Nginx from auto-starting during install
-print_status "Temporarily masking nginx to avoid premature start..."
-systemctl mask nginx
-
-# Install required packages
-if ! apt-get install -y \
-    nginx \
-    "$PHP_VERSION-fpm" \
-    "$PHP_VERSION-pgsql" \
-    "$PHP_VERSION-redis" \
-    "$PHP_VERSION-curl" \
-    "$PHP_VERSION-gd" \
-    "$PHP_VERSION-mbstring" \
-    "$PHP_VERSION-xml" \
-    "$PHP_VERSION-zip" \
-    postgresql \
-    postgresql-contrib \
-    redis-server \
-    fail2ban \
-    curl \
-    openssl; then
-    print_error "Failed to install required packages"
-    exit 1
-fi
-
-# Install Composer manually (in case package version is outdated)
-print_status "Installing Composer..."
-curl -sS https://getcomposer.org/installer | php
-mv composer.phar /usr/local/bin/composer
-chmod +x /usr/local/bin/composer
-
-# Unmask Nginx and write config BEFORE starting it
-print_status "Unmasking nginx and writing configuration..."
-systemctl unmask nginx
-
-# Call your config write function now (move this here in the script!)
-write_default_nginx_config
-
-# Test Nginx config BEFORE starting service
-if ! nginx -t; then
-    print_error "Nginx configuration test failed. Please check /etc/nginx/nginx.conf."
-    exit 1
-fi
-
-# Start and enable all services
-if command_exists systemctl; then
-    for service in nginx "${PHP_VERSION}-fpm" postgresql redis-server fail2ban; do
-        print_status "Enabling and starting $service..."
-        systemctl enable "$service"
-        systemctl restart "$service"
-    done
-else
-    for service in nginx "${PHP_VERSION}-fpm" postgresql redis-server fail2ban; do
-        print_status "Starting $service with legacy init system..."
-        service "$service" restart
-    done
-fi
-
-print_status "Required packages installed successfully"
-
 
 # Function to check package version
 check_package_version() {
@@ -321,25 +76,444 @@ generate_secure_password() {
     openssl rand -base64 32 | tr -dc 'a-zA-Z0-9!@#$%^&*()_+' | head -c 32
 }
 
-# Function to create environment files
-create_env_files() {
-    print_status "Creating secure environment configuration files..."
+# Function to install Node.js and npm
+install_nodejs() {
+    print_status "Installing Node.js and npm..."
+    
+    # Check if Node.js is already installed
+    if command_exists node; then
+        current_version=$(node -v | grep -oP '\d+\.\d+\.\d+')
+        if check_package_version node "16.0.0"; then
+            print_status "Node.js $current_version is already installed and compatible"
+            return 0
+        else
+            print_warning "Node.js $current_version is installed but needs update"
+        fi
+    fi
+
+    # Add NodeSource repository
+    curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+    
+    # Install Node.js and npm
+    if ! apt-get install -y nodejs; then
+        print_error "Failed to install Node.js"
+        return 1
+    fi
+
+    # Verify installation
+    if ! command_exists node || ! command_exists npm; then
+        print_error "Node.js or npm installation failed"
+        return 1
+    fi
+
+    print_status "Node.js and npm installed successfully"
+    return 0
+}
+
+# Function to install PHP and required extensions
+install_php() {
+    print_status "Installing PHP and required extensions..."
+    
+    # Check if PHP is already installed
+    if command_exists php; then
+        current_version=$(php -v | grep -oP '\d+\.\d+\.\d+')
+        if check_package_version php "7.4.0"; then
+            print_status "PHP $current_version is already installed and compatible"
+            return 0
+        else
+            print_warning "PHP $current_version is installed but needs update"
+        fi
+    fi
+
+    # Add PHP repository
+    add-apt-repository -y ppa:ondrej/php
+    
+    # Install PHP and required extensions
+    if ! apt-get install -y php8.1-fpm php8.1-pgsql php8.1-redis php8.1-curl \
+        php8.1-gd php8.1-mbstring php8.1-xml php8.1-zip php8.1-json; then
+        print_error "Failed to install PHP and extensions"
+        return 1
+    fi
+
+    print_status "PHP and extensions installed successfully"
+    return 0
+}
+
+# Function to install PostgreSQL
+install_postgresql() {
+    print_status "Installing PostgreSQL..."
+    
+    # Check if PostgreSQL is already installed
+    if command_exists psql; then
+        current_version=$(psql --version | grep -oP '\d+\.\d+\.\d+')
+        if check_package_version postgres "12.0.0"; then
+            print_status "PostgreSQL $current_version is already installed and compatible"
+            return 0
+        else
+            print_warning "PostgreSQL $current_version is installed but needs update"
+        fi
+    fi
+
+    # Install PostgreSQL
+    if ! apt-get install -y postgresql postgresql-contrib; then
+        print_error "Failed to install PostgreSQL"
+        return 1
+    fi
+
+    print_status "PostgreSQL installed successfully"
+    return 0
+}
+
+# Function to install Redis
+install_redis() {
+    print_status "Installing Redis..."
+    
+    # Check if Redis is already installed
+    if command_exists redis-cli; then
+        current_version=$(redis-cli --version | grep -oP '\d+\.\d+\.\d+')
+        if check_package_version redis-cli "6.0.0"; then
+            print_status "Redis $current_version is already installed and compatible"
+            return 0
+        else
+            print_warning "Redis $current_version is installed but needs update"
+        fi
+    fi
+
+    # Install Redis
+    if ! apt-get install -y redis-server; then
+        print_error "Failed to install Redis"
+        return 1
+    fi
+
+    print_status "Redis installed successfully"
+    return 0
+}
+
+# Function to install Nginx
+install_nginx() {
+    print_status "Installing Nginx..."
+    
+    # Check if Nginx is already installed
+    if command_exists nginx; then
+        current_version=$(nginx -v 2>&1 | grep -oP '\d+\.\d+\.\d+')
+        if check_package_version nginx "1.18.0"; then
+            print_status "Nginx $current_version is already installed and compatible"
+            return 0
+        else
+            print_warning "Nginx $current_version is installed but needs update"
+        fi
+    fi
+
+    # Install Nginx
+    if ! apt-get install -y nginx; then
+        print_error "Failed to install Nginx"
+        return 1
+    fi
+
+    print_status "Nginx installed successfully"
+    return 0
+}
+
+# Function to configure Nginx
+configure_nginx() {
+    print_status "Configuring Nginx..."
+    
+    # Create Nginx configuration
+    cat > /etc/nginx/sites-available/weblyn << 'EOL'
+server {
+    listen 80;
+    server_name _;
+    root /var/www/html;
+    index login.html;
+
+    # Security headers
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self';" always;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
+
+    # Main PHP endpoints (api.php, auth.php, etc.)
+    location ~ ^/(api|auth|config|csp-report|login|signup)\.php$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/var/run/php/php8.1-fpm.sock;
+        fastcgi_param SCRIPT_FILENAME $document_root/$fastcgi_script_name;
+    }
+
+    # Admin PHP endpoints
+    location ~ ^/admin/(.*\.php)$ {
+        alias /var/www/html/admin/$1;
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/var/run/php/php8.1-fpm.sock;
+        fastcgi_param SCRIPT_FILENAME /var/www/html/admin/$1;
+    }
+
+    # Default route: serve login.html
+    location / {
+        try_files $uri $uri/ /login.html;
+    }
+
+    # Serve static files
+    location ~* \.(css|js|jpg|jpeg|png|gif|ico|svg|woff|woff2|ttf|eot)$ {
+        expires 30d;
+        add_header Cache-Control "public, no-transform";
+    }
+
+    # Deny access to sensitive files
+    location ~ /\. {
+        deny all;
+        access_log off;
+        log_not_found off;
+    }
+
+    location ~* \.(env|log|git|svn|htaccess|htpasswd|ini|phps|fla|psd|sh|sql|json|bak|backup|old|swp|tmp)$ {
+        deny all;
+    }
+
+    # Error pages
+    error_page 404 /404.html;
+    error_page 500 502 503 504 /50x.html;
+}
+EOL
+
+    # Enable the site
+    ln -sf /etc/nginx/sites-available/weblyn /etc/nginx/sites-enabled/
+    rm -f /etc/nginx/sites-enabled/default
+
+    # Create error pages
+    mkdir -p /var/www/html/public
+    cat > /var/www/html/public/404.html << 'EOL'
+<!DOCTYPE html>
+<html>
+<head>
+    <title>404 Not Found</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+        h1 { color: #333; }
+    </style>
+</head>
+<body>
+    <h1>404 - Page Not Found</h1>
+    <p>The page you are looking for does not exist.</p>
+    <a href="/">Return to Home</a>
+</body>
+</html>
+EOL
+
+    cat > /var/www/html/public/50x.html << 'EOL'
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Server Error</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; }
+        h1 { color: #333; }
+    </style>
+</head>
+<body>
+    <h1>500 - Server Error</h1>
+    <p>Something went wrong on our end. Please try again later.</p>
+    <a href="/">Return to Home</a>
+</body>
+</html>
+EOL
+
+    # Test configuration
+    if ! nginx -t; then
+        print_error "Nginx configuration test failed"
+        return 1
+    fi
+
+    print_status "Nginx configured successfully"
+    return 0
+}
+
+# Function to configure PHP
+configure_php() {
+    print_status "Configuring PHP..."
+    
+    # Create PHP configuration
+    cat > /etc/php/8.1/fpm/conf.d/99-weblyn.ini << 'EOL'
+expose_php = Off
+display_errors = Off
+display_startup_errors = Off
+log_errors = On
+error_log = /var/log/weblyn/php_errors.log
+allow_url_fopen = Off
+allow_url_include = Off
+session.cookie_httponly = 1
+session.cookie_secure = 1
+session.use_strict_mode = 1
+session.cookie_samesite = "Strict"
+EOL
+
+    print_status "PHP configured successfully"
+    return 0
+}
+
+# Function to configure PostgreSQL
+configure_postgresql() {
+    print_status "Configuring PostgreSQL..."
+    
+    # Generate secure password
+    DB_PASSWORD=$(generate_secure_password)
+    
+    # Create database and user
+    su - postgres -c "psql -c \"CREATE USER weblyn WITH PASSWORD '$DB_PASSWORD';\""
+    su - postgres -c "psql -c \"CREATE DATABASE weblyn OWNER weblyn;\""
+    
+    # Store password securely
+    echo "DB_PASSWORD=$DB_PASSWORD" > /root/weblyn_db_credentials
+    chmod 600 /root/weblyn_db_credentials
+    
+    print_status "PostgreSQL configured successfully"
+    return 0
+}
+
+# Function to configure Redis
+configure_redis() {
+    print_status "Configuring Redis..."
+    
+    # Generate secure password
+    REDIS_PASSWORD=$(generate_secure_password)
+    
+    # Configure Redis
+    sed -i "s/# requirepass foobared/requirepass $REDIS_PASSWORD/" /etc/redis/redis.conf
+    
+    # Store password securely
+    echo "REDIS_PASSWORD=$REDIS_PASSWORD" > /root/weblyn_redis_credentials
+    chmod 600 /root/weblyn_redis_credentials
+    
+    print_status "Redis configured successfully"
+    return 0
+}
+
+# Function to configure fail2ban
+configure_fail2ban() {
+    print_status "Configuring fail2ban..."
+    
+    # Create fail2ban configuration
+    cat > /etc/fail2ban/jail.local << 'EOL'
+[DEFAULT]
+bantime = 3600
+findtime = 600
+maxretry = 5
+
+[sshd]
+enabled = true
+port = ssh
+filter = sshd
+logpath = /var/log/auth.log
+maxretry = 3
+
+[nginx-http-auth]
+enabled = true
+filter = nginx-http-auth
+port = http,https
+logpath = /var/log/nginx/error.log
+
+[php-url-fopen]
+enabled = true
+port = http,https
+filter = php-url-fopen
+logpath = /var/log/weblyn/error.log
+EOL
+
+    print_status "fail2ban configured successfully"
+    return 0
+}
+
+# Function to create necessary directories and set permissions
+setup_directories() {
+    print_status "Setting up directories and permissions..."
+    
+    # Create directories
+    mkdir -p /var/www/html/public
+    mkdir -p /var/www/html/admin
+    mkdir -p /var/log/weblyn
+    
+    # Set permissions
+    chown -R www-data:www-data /var/www/html
+    chmod -R 755 /var/www/html
+    chmod -R 775 /var/log/weblyn
+    
+    print_status "Directories and permissions set up successfully"
+    return 0
+}
+
+# Function to download and setup project files
+setup_project_files() {
+    print_status "Setting up project files..."
     
     # Create necessary directories
-    mkdir -p /var/www/html
+    mkdir -p /var/www/html/public
+    mkdir -p /var/www/html/admin
+    mkdir -p /var/log/weblyn
     
-    # Generate secure passwords
-    DB_PASSWORD=$(generate_secure_password)
-    REDIS_PASSWORD=$(generate_secure_password)
-    SESSION_SECRET=$(generate_secure_password)
-    JWT_SECRET=$(generate_secure_password)
+    # Download files
+    BASE_URL="https://raw.githubusercontent.com/iLikeLemonR/Weblyn/EnhancedDEMV1.0/Webpage"
     
-    # Create .env file with secure values
+    # Download PHP files
+    for file in auth.php config.php login.php signup.php csp-report.php api.php; do
+        print_status "Downloading $file..."
+        if ! curl -s "${BASE_URL}/${file}" -o "/var/www/html/${file}"; then
+            print_error "Failed to download $file"
+            return 1
+        fi
+    done
+    
+    # Download HTML files
+    for file in login.html signup.html dashboard.html; do
+        print_status "Downloading $file..."
+        if ! curl -s "${BASE_URL}/${file}" -o "/var/www/html/public/${file}"; then
+            print_error "Failed to download $file"
+            return 1
+        fi
+    done
+    
+    # Download admin files
+    mkdir -p /var/www/html/admin
+    for file in handle-signup.php notifications.php mark-read.php; do
+        print_status "Downloading admin/$file..."
+        if ! curl -s "${BASE_URL}/admin/${file}" -o "/var/www/html/admin/${file}"; then
+            print_error "Failed to download admin/$file"
+            return 1
+        fi
+    done
+    
+    # Download static files
+    for file in dashcss.css dashjs.js statsPuller.js api.js; do
+        print_status "Downloading $file..."
+        if ! curl -s "${BASE_URL}/${file}" -o "/var/www/html/public/${file}"; then
+            print_error "Failed to download $file"
+            return 1
+        fi
+    done
+    
+    # Set proper permissions
+    chown -R www-data:www-data /var/www/html
+    find /var/www/html -type f -exec chmod 644 {} \;
+    find /var/www/html -type d -exec chmod 755 {} \;
+    
+    print_status "Project files set up successfully"
+    return 0
+}
+
+# Function to create environment files
+create_env_files() {
+    print_status "Creating environment files..."
+    
+    # Load stored credentials
+    source /root/weblyn_db_credentials
+    source /root/weblyn_redis_credentials
+    
+    # Create .env file
     cat > /var/www/html/.env << EOL
 # Database Configuration
 DB_HOST=localhost
 DB_NAME=weblyn
-DB_USER=weblyn_user
+DB_USER=weblyn
 DB_PASS=${DB_PASSWORD}
 
 # Redis Configuration
@@ -351,14 +525,14 @@ REDIS_PASS=${REDIS_PASSWORD}
 APP_NAME=Weblyn
 APP_ENV=production
 APP_DEBUG=false
-APP_URL=https://${DOMAIN_NAME:-localhost}
+APP_URL=http://localhost
 APP_KEY=$(openssl rand -base64 32)
 
 # Security Settings
 SESSION_LIFETIME=3600
 SESSION_NAME=weblyn_session
-SESSION_SECRET=${SESSION_SECRET}
-JWT_SECRET=${JWT_SECRET}
+SESSION_SECRET=$(openssl rand -base64 32)
+JWT_SECRET=$(openssl rand -base64 32)
 PASSWORD_MIN_LENGTH=12
 PASSWORD_REQUIRE_SPECIAL=true
 PASSWORD_REQUIRE_NUMBERS=true
@@ -397,318 +571,76 @@ EOL
 
     # Set proper permissions
     chmod 600 /var/www/html/.env
+    chown www-data:www-data /var/www/html/.env
     
-    # Store passwords securely for later use
-    echo "DB_PASSWORD=${DB_PASSWORD}" > /root/weblyn_credentials
-    echo "REDIS_PASSWORD=${REDIS_PASSWORD}" >> /root/weblyn_credentials
-    chmod 600 /root/weblyn_credentials
-}
-
-# Function to configure security settings
-configure_security() {
-    print_status "Configuring security settings..."
-    
-    # Get PHP version
-    PHP_VERSION=$(get_latest_php_version)
-    if [ -z "$PHP_VERSION" ]; then
-        print_error "Could not determine PHP version"
-        exit 1
-    fi
-    
-    # Configure PHP security
-    cat > "/etc/php/${PHP_VERSION#php}/fpm/conf.d/99-security.ini" << 'EOL'
-expose_php = Off
-display_errors = Off
-display_startup_errors = Off
-log_errors = On
-error_log = /var/log/weblyn/php_errors.log
-allow_url_fopen = Off
-allow_url_include = Off
-session.cookie_httponly = 1
-session.cookie_secure = 1
-session.use_strict_mode = 1
-session.cookie_samesite = "Strict"
-EOL
-
-    # Configure NGINX global security headers (no location blocks)
-    cat > /etc/nginx/conf.d/security.conf << 'EOL'
-server {
-    # Security headers
-    add_header X-Frame-Options "SAMEORIGIN" always;
-    add_header X-XSS-Protection "1; mode=block" always;
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self';" always;
-    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
-
-    # Disable server tokens
-    server_tokens off;
-
-    # Prevent access to hidden files
-    location ~ /\. {
-        deny all;
-        access_log off;
-        log_not_found off;
-    }
-
-    # Prevent access to sensitive files
-    location ~* \.(env|log|git|svn|htaccess|htpasswd|ini|phps|fla|psd|sh|sql|json)$ {
-        deny all;
-    }
-}
-EOL
-
-    # Configure fail2ban
-    cat > /etc/fail2ban/jail.local << 'EOL'
-[DEFAULT]
-bantime = 3600
-findtime = 600
-maxretry = 5
-
-[sshd]
-enabled = true
-port = ssh
-filter = sshd
-logpath = /var/log/auth.log
-maxretry = 3
-
-[nginx-http-auth]
-enabled = true
-filter = nginx-http-auth
-port = http,https
-logpath = /var/log/nginx/error.log
-
-[php-url-fopen]
-enabled = true
-port = http,https
-filter = php-url-fopen
-logpath = /var/log/weblyn/error.log
-EOL
-
-    # Restart services
-    if command_exists systemctl; then
-        systemctl restart "${PHP_VERSION}-fpm"
-        systemctl restart nginx
-        systemctl restart fail2ban
-    else
-        service "${PHP_VERSION}-fpm" restart
-        service nginx restart
-        service fail2ban restart
-    fi
-}
-
-# Function to download and setup files
-download_and_setup_files() {
-    print_status "Downloading and setting up application files..."
-    
-    # Create necessary directories
-    mkdir -p /var/www/html/public
-    mkdir -p /var/www/html/admin
-    mkdir -p /var/log/weblyn
-    
-    # Set proper permissions
-    chown -R www-data:www-data /var/www/html
-    chmod -R 755 /var/www/html
-    chmod -R 775 /var/log/weblyn
-    
-    # Download files
-    BASE_URL="https://raw.githubusercontent.com/iLikeLemonR/Weblyn/EnhancedDEMV1.0/Webpage"
-    
-    # Download PHP files
-    for file in auth.php config.php login.php signup.php csp-report.php api.php; do
-        curl -s "${BASE_URL}/${file}" -o "/var/www/html/${file}"
-    done
-    
-    # Download HTML files
-    for file in login.html signup.html dashboard.html; do
-        curl -s "${BASE_URL}/${file}" -o "/var/www/html/public/${file}"
-    done
-    
-    # Download admin files
-    mkdir -p /var/www/html/admin
-    for file in handle-signup.php notifications.php mark-read.php; do
-        curl -s "${BASE_URL}/admin/${file}" -o "/var/www/html/admin/${file}"
-    done
-    
-    # Download static files
-    for file in dashcss.css dashjs.js statsPuller.js api.js; do
-        curl -s "${BASE_URL}/${file}" -o "/var/www/html/public/${file}"
-    done
-    
-    # Set proper permissions
-    chown -R www-data:www-data /var/www/html
-    find /var/www/html -type f -exec chmod 644 {} \;
-    find /var/www/html -type d -exec chmod 755 {} \;
-}
-
-# Function to prompt for domain configuration
-configure_domain() {
-    print_status "Configuring domain settings..."
-    
-    read -p "Do you want to use a domain name? (y/N): " use_domain
-    if [[ $use_domain =~ ^[Yy]$ ]]; then
-        read -p "Enter your domain name (e.g., example.com): " domain_name
-        DOMAIN_NAME=$domain_name
-    else
-        DOMAIN_NAME="localhost"
-    fi
-    
-    # Update nginx configuration
-    if [ "$DOMAIN_NAME" != "localhost" ]; then
-        # Configure for domain
-        cat > /etc/nginx/sites-available/default <<EOL
-server {
-    listen 80;
-    listen [::]:80;
-    server_name ${DOMAIN_NAME};
-    root /var/www/html;
-    index index.html index.htm index.php;
-    
-    location / {
-        try_files \$uri \$uri/ =404;
-    }
-    
-    location ~ \.php$ {
-        include snippets/fastcgi-php.conf;
-        fastcgi_pass unix:/var/run/php/php-fpm.sock;
-    }
-    
-    location ~ /\.ht {
-        deny all;
-    }
-}
-EOL
-    else
-        # Configure for localhost
-        cat > /etc/nginx/sites-available/default <<EOL
-server {
-    listen 80 default_server;
-    listen [::]:80 default_server;
-    root /var/www/html;
-    index index.html index.htm index.php;
-    server_name _;
-    
-    location / {
-        try_files \$uri \$uri/ =404;
-    }
-    
-    location ~ \.php$ {
-        include snippets/fastcgi-php.conf;
-        fastcgi_pass unix:/var/run/php/php-fpm.sock;
-    }
-    
-    location ~ /\.ht {
-        deny all;
-    }
-}
-EOL
-    fi
-    
-    # Test and reload nginx
-    nginx -t && systemctl reload nginx
+    print_status "Environment files created successfully"
+    return 0
 }
 
 # Function to initialize database
 initialize_database() {
     print_status "Initializing database..."
     
-    # Create database and user
-    sudo -u postgres psql -c "CREATE DATABASE weblyn;"
-    sudo -u postgres psql -c "CREATE USER weblyn_user WITH PASSWORD '${DB_PASSWORD}';"
-    sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE weblyn TO weblyn_user;"
+    # Load stored credentials
+    source /root/weblyn_db_credentials
     
-    # Create tables
-    sudo -u postgres psql weblyn <<EOL
-CREATE TABLE users (
-    id SERIAL PRIMARY KEY,
-    username VARCHAR(50) UNIQUE NOT NULL,
-    email VARCHAR(255) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
-    role VARCHAR(20) NOT NULL DEFAULT 'user',
-    is_active BOOLEAN NOT NULL DEFAULT true,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE sessions (
-    id SERIAL PRIMARY KEY,
-    user_id INTEGER REFERENCES users(id),
-    session_token VARCHAR(255) NOT NULL,
-    refresh_token VARCHAR(255) NOT NULL,
-    ip_address VARCHAR(45) NOT NULL,
-    user_agent TEXT NOT NULL,
-    is_valid BOOLEAN NOT NULL DEFAULT true,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    expires_at TIMESTAMP NOT NULL,
-    last_activity TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE notifications (
-    id SERIAL PRIMARY KEY,
-    user_id INTEGER REFERENCES users(id),
-    message TEXT NOT NULL,
-    is_read BOOLEAN NOT NULL DEFAULT false,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-EOL
+    # Import schema
+    if ! PGPASSWORD=$DB_PASSWORD psql -h localhost -U weblyn -d weblyn -f /var/www/html/schema.sql; then
+        print_error "Failed to import database schema"
+        return 1
+    fi
+    
+    print_status "Database initialized successfully"
+    return 0
 }
 
 # Function to create admin user
 create_admin_user() {
     print_status "Creating admin user..."
     
-    read -p "Enter admin username: " admin_username
-    read -p "Enter admin email: " admin_email
-    read -s -p "Enter admin password: " admin_password
+    # Prompt for admin credentials
+    read -p "Enter admin username: " ADMIN_USERNAME
+    read -s -p "Enter admin password: " ADMIN_PASSWORD
     echo
+    read -p "Enter admin email: " ADMIN_EMAIL
     
-    # Hash the password
-    password_hash=$(php -r "echo password_hash('${admin_password}', PASSWORD_DEFAULT);")
+    # Load stored credentials
+    source /root/weblyn_db_credentials
     
-    # Insert admin user
-    sudo -u postgres psql weblyn <<EOL
-INSERT INTO users (username, email, password_hash, role, is_active)
-VALUES ('${admin_username}', '${admin_email}', '${password_hash}', 'admin', true);
-EOL
+    # Create admin user
+    ADMIN_PASSWORD_HASH=$(php -r "echo password_hash('$ADMIN_PASSWORD', PASSWORD_DEFAULT);")
+    
+    if ! PGPASSWORD=$DB_PASSWORD psql -h localhost -U weblyn -d weblyn -c "INSERT INTO users (username, password_hash, email, is_admin) VALUES ('$ADMIN_USERNAME', '$ADMIN_PASSWORD_HASH', '$ADMIN_EMAIL', true);"; then
+        print_error "Failed to create admin user"
+        return 1
+    fi
+    
+    print_status "Admin user created successfully"
+    return 0
 }
 
-# Function to verify services
-verify_services() {
-    print_status "Verifying services..."
+# Function to start and enable services
+start_services() {
+    print_status "Starting and enabling services..."
     
-    # Check nginx
-    if ! systemctl is-active --quiet nginx; then
-        print_error "Nginx is not running"
-        systemctl start nginx
-    fi
+    # Start and enable services
+    systemctl enable nginx
+    systemctl enable php8.1-fpm
+    systemctl enable postgresql
+    systemctl enable redis-server
+    systemctl enable fail2ban
     
-    # Check PHP-FPM
-    PHP_VERSION=$(get_latest_php_version)
-    if ! systemctl is-active --quiet "${PHP_VERSION}-fpm"; then
-        print_error "PHP-FPM is not running"
-        systemctl start "${PHP_VERSION}-fpm"
-    fi
+    systemctl restart nginx
+    systemctl restart php8.1-fpm
+    systemctl restart postgresql
+    systemctl restart redis-server
+    systemctl restart fail2ban
     
-    # Check database
-    if ! sudo -u postgres psql -lqt | cut -d \| -f 1 | grep -qw weblyn; then
-        print_error "Database 'weblyn' does not exist"
-        initialize_database
-    fi
-    
-    # Check Redis
-    if ! systemctl is-active --quiet redis-server; then
-        print_error "Redis is not running"
-        systemctl start redis-server
-    fi
-    
-    # Test web access
-    if curl -s http://localhost > /dev/null; then
-        print_status "Web server is accessible"
-    else
-        print_error "Web server is not accessible"
-    fi
+    print_status "Services started and enabled successfully"
+    return 0
 }
 
-# Main installation process
+# Main function
 main() {
     print_status "Starting Weblyn installation..."
     
@@ -718,18 +650,31 @@ main() {
         exit 1
     fi
     
-    # Install required packages
-    install_required_packages
+    # Update package lists
+    apt-get update
     
-    # Write default nginx config and secure security.conf
-    write_default_nginx_config
-    write_nginx_security_conf
+    # Install required packages
+    install_nodejs
+    install_php
+    install_postgresql
+    install_redis
+    install_nginx
+    
+    # Configure services
+    configure_nginx
+    configure_php
+    configure_postgresql
+    configure_redis
+    configure_fail2ban
+    
+    # Setup directories and permissions
+    setup_directories
+    
+    # Setup project files
+    setup_project_files
     
     # Create environment files
     create_env_files
-    
-    # Configure domain
-    configure_domain
     
     # Initialize database
     initialize_database
@@ -737,29 +682,11 @@ main() {
     # Create admin user
     create_admin_user
     
-    # Configure PHP and fail2ban security
-    configure_security
+    # Start and enable services
+    start_services
     
-    # Download and setup files
-    download_and_setup_files
-    
-    # Verify services
-    verify_services
-    
-    # Set proper permissions
-    chown -R www-data:www-data /var/www/html
-    find /var/www/html -type d -exec chmod 755 {} \;
-    find /var/www/html -type f -exec chmod 644 {} \;
-    chmod -R 775 /var/log/weblyn
-    chown -R www-data:www-data /var/log/weblyn
-    
-    print_status "Final verification..."
-    nginx -t && print_status "Nginx config OK" || print_error "Nginx config error!"
-    systemctl status nginx --no-pager | grep -q running && print_status "Nginx running" || print_error "Nginx not running!"
-    systemctl status postgresql --no-pager | grep -q running && print_status "PostgreSQL running" || print_error "PostgreSQL not running!"
-    systemctl status redis-server --no-pager | grep -q running && print_status "Redis running" || print_error "Redis not running!"
     print_status "Installation completed successfully!"
-    print_status "Access your site at: http://localhost or your configured domain."
+    print_status "Access your site at: http://localhost"
 }
 
 # Run main function

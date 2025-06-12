@@ -271,20 +271,31 @@ EOL
 
     # Configure NGINX global security headers (no location blocks)
     cat > /etc/nginx/conf.d/security.conf << 'EOL'
-add_header X-Frame-Options "SAMEORIGIN" always;
-add_header X-XSS-Protection "1; mode=block" always;
-add_header X-Content-Type-Options "nosniff" always;
-add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self';" always;
-add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
-server_tokens off;
-EOL
+server {
+    # Security headers
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self';" always;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
 
-    # Add location blocks to the default server block if not present
-    DEFAULT_SITE="/etc/nginx/sites-available/default"
-    if ! grep -q 'location ~ /\.' "$DEFAULT_SITE"; then
-        sed -i '/server {/a \\n    # Prevent access to hidden files\n    location ~ /\\. {\n        deny all;\n        access_log off;\n        log_not_found off;\n    }\n\n    # Prevent access to sensitive files\n    location ~* \\.(env|log|git|svn|htaccess|htpasswd|ini|phps|fla|psd|sh|sql|json)$ {\n        deny all;\n    }' "$DEFAULT_SITE"
-    fi
+    # Disable server tokens
+    server_tokens off;
+
+    # Prevent access to hidden files
+    location ~ /\. {
+        deny all;
+        access_log off;
+        log_not_found off;
+    }
+
+    # Prevent access to sensitive files
+    location ~* \.(env|log|git|svn|htaccess|htpasswd|ini|phps|fla|psd|sh|sql|json)$ {
+        deny all;
+    }
+}
+EOL
 
     # Configure fail2ban
     cat > /etc/fail2ban/jail.local << 'EOL'

@@ -59,7 +59,7 @@
     <div class="container">
         <div class="login-container">
             <h2 class="text-center mb-4">Login</h2>
-            <form action="login.php" method="POST" id="loginForm">
+            <form action="/login.php" method="POST" id="loginForm">
                 <input type="hidden" id="csrf_token" name="csrf_token" value="">
                 <div class="form-floating">
                     <input type="text" class="form-control" id="username" name="username" placeholder="Username" required>
@@ -79,19 +79,22 @@
             </form>
             <div class="success-message" id="successMessage"></div>
             <p style="text-align: center; margin-top: 15px;">
-                Don't have an account? <a href="signup.html">Sign up here</a>
+                Don't have an account? <a href="/public/signup.html">Sign up here</a>
             </p>
         </div>
     </div>
 
     <script>
         // Fetch CSRF token on page load
-        fetch('login.php?get_csrf_token=1')
+        fetch('/login.php?get_csrf_token=1')
             .then(response => response.json())
             .then(data => {
                 if (data.csrf_token) {
                     document.getElementById('csrf_token').value = data.csrf_token;
                 }
+            })
+            .catch(error => {
+                console.error('Error fetching CSRF token:', error);
             });
 
         // Update AJAX logic to include CSRF token
@@ -101,27 +104,42 @@
             const formData = new FormData(this);
             // Ensure CSRF token is included
             formData.set('csrf_token', document.getElementById('csrf_token').value);
-            const response = await fetch('login.php', {
-                method: 'POST',
-                body: formData,
-                headers: { 'X-Requested-With': 'XMLHttpRequest' }
-            });
-            const data = await response.json();
-            if (data.success) {
-                window.location.href = data.redirect;
-            } else {
+            
+            try {
+                const response = await fetch('/login.php', {
+                    method: 'POST',
+                    body: formData,
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    window.location.href = data.redirect;
+                } else {
+                    const errorDiv = document.createElement('div');
+                    errorDiv.className = 'alert alert-danger';
+                    errorDiv.textContent = data.message || 'Login failed.';
+                    const existingAlert = document.querySelector('.alert');
+                    if (existingAlert) {
+                        existingAlert.remove();
+                    }
+                    this.insertBefore(errorDiv, this.firstChild);
+                    // Show MFA section if needed
+                    if ((data.message || '').includes('MFA code required')) {
+                        document.getElementById('mfaSection').classList.add('active');
+                    }
+                }
+            } catch (error) {
+                console.error('Login error:', error);
                 const errorDiv = document.createElement('div');
                 errorDiv.className = 'alert alert-danger';
-                errorDiv.textContent = data.message || 'Login failed.';
+                errorDiv.textContent = 'An error occurred during login. Please try again.';
                 const existingAlert = document.querySelector('.alert');
                 if (existingAlert) {
                     existingAlert.remove();
                 }
                 this.insertBefore(errorDiv, this.firstChild);
-                // Show MFA section if needed
-                if ((data.message || '').includes('MFA code required')) {
-                    document.getElementById('mfaSection').classList.add('active');
-                }
             }
         });
     </script>

@@ -49,6 +49,7 @@
             border-radius: 4px;
             background: var(--input-bg);
             color: var(--text-color);
+            box-sizing: border-box;
         }
         
         .form-group input:focus {
@@ -82,6 +83,11 @@
         
         .btn:hover {
             background: #0056b3;
+        }
+        
+        .btn:disabled {
+            background: #666;
+            cursor: not-allowed;
         }
         
         a {
@@ -127,22 +133,25 @@
                 <div class="error-message" id="confirmPasswordError"></div>
             </div>
             
-            <button type="submit" class="btn">Sign Up</button>
+            <button type="submit" class="btn" id="submitBtn">Sign Up</button>
         </form>
         <div class="success-message" id="successMessage"></div>
         <p style="text-align: center; margin-top: 15px;">
-            Already have an account? <a href="login.html">Login here</a>
+            Already have an account? <a href="../login.html">Login here</a>
         </p>
     </div>
 
     <script>
         // Fetch CSRF token on page load
-        fetch('login.php?get_csrf_token=1')
+        fetch('/login.php?get_csrf_token=1')
             .then(response => response.json())
             .then(data => {
                 if (data.csrf_token) {
                     document.getElementById('csrf_token').value = data.csrf_token;
                 }
+            })
+            .catch(error => {
+                console.error('Error fetching CSRF token:', error);
             });
 
         function validateForm() {
@@ -193,6 +202,11 @@
                 return false;
             }
             
+            const submitBtn = document.getElementById('submitBtn');
+            const originalText = submitBtn.textContent;
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Creating Account...';
+            
             const formData = {
                 username: document.getElementById('username').value,
                 email: document.getElementById('email').value,
@@ -201,7 +215,7 @@
             };
             
             try {
-                const response = await fetch('signup.php', {
+                const response = await fetch('/signup.php', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -219,12 +233,17 @@
                     throw new Error(data.message || 'Signup failed');
                 }
             } catch (error) {
+                console.error('Signup error:', error);
                 document.getElementById('successMessage').textContent = error.message;
+                document.getElementById('successMessage').style.color = 'var(--error-color)';
                 document.getElementById('successMessage').style.display = 'block';
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalText;
             }
             
             return false;
         }
     </script>
 </body>
-</html> 
+</html>

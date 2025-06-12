@@ -17,6 +17,7 @@ function get_csrf_token() {
     }
     return $_SESSION['csrf_token'];
 }
+
 function validate_csrf_token($token) {
     return isset($_SESSION['csrf_token']) && hash_equals($_SESSION['csrf_token'], $token);
 }
@@ -30,23 +31,29 @@ try {
         if (!validate_csrf_token($csrfToken)) {
             throw new Exception('Invalid CSRF token.');
         }
+        
         // Validate and sanitize input
         $username = filter_input(INPUT_POST, 'username', FILTER_SANITIZE_FULL_SPECIAL_CHARS);
         $password = filter_input(INPUT_POST, 'password', FILTER_UNSAFE_RAW);
         $mfaCode = filter_input(INPUT_POST, 'mfa_code', FILTER_SANITIZE_NUMBER_INT);
+        
         if (!$username || !$password) {
             throw new Exception('Invalid input. Please try again.');
         }
+        
         // Attempt login
         if ($auth->login($username, $password, $mfaCode)) {
+            // Get proper redirect URL based on user role
+            $redirectUrl = $auth->getRedirectUrl($_SESSION['user_id']);
+            
             // AJAX request
             if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest') {
-                echo json_encode(['success' => true, 'redirect' => '/dashboard.html']);
+                echo json_encode(['success' => true, 'redirect' => $redirectUrl]);
                 ob_end_flush();
                 exit;
             } else {
                 // Normal POST
-                header('Location: /dashboard.html');
+                header('Location: ' . $redirectUrl);
                 ob_end_flush();
                 exit;
             }
@@ -55,6 +62,13 @@ try {
         // For AJAX: provide CSRF token
         if (isset($_GET['get_csrf_token'])) {
             echo json_encode(['csrf_token' => get_csrf_token()]);
+            exit;
+        }
+        
+        // Check if user is already logged in
+        if (isset($_SESSION['user_id']) && $auth->validateSession()) {
+            $redirectUrl = $auth->getRedirectUrl($_SESSION['user_id']);
+            header('Location: ' . $redirectUrl);
             exit;
         }
     }

@@ -223,6 +223,23 @@ install_nginx() {
     return 0
 }
 
+# Function to install Fail2Ban
+install_fail2ban() {
+    print_status "Installing Fail2Ban..."
+
+    if ! command_exists fail2ban-client; then
+        apt-get install -y fail2ban || {
+            print_error "Failed to install Fail2Ban"
+            return 1
+        }
+        print_status "Fail2Ban installed successfully"
+    else
+        print_status "Fail2Ban is already installed"
+    fi
+
+    return 0
+}
+
 # Function to configure Nginx
 configure_nginx() {
     print_status "Configuring Nginx..."
@@ -364,21 +381,32 @@ EOL
 # Function to configure PostgreSQL
 configure_postgresql() {
     print_status "Configuring PostgreSQL..."
-    
-    # Generate secure password
+
     DB_PASSWORD=$(generate_secure_password)
-    
-    # Create database and user
-    su - postgres -c "psql -c \"CREATE USER weblyn WITH PASSWORD '$DB_PASSWORD';\""
-    su - postgres -c "psql -c \"CREATE DATABASE weblyn OWNER weblyn;\""
-    
+
+    # Check if user exists
+    if ! su - postgres -c "psql -tAc \"SELECT 1 FROM pg_roles WHERE rolname='weblyn'\"" | grep -q 1; then
+        su - postgres -c "psql -c \"CREATE USER weblyn WITH PASSWORD '$DB_PASSWORD';\""
+    else
+        print_warning "Role 'weblyn' already exists"
+        su - postgres -c "psql -c \"ALTER USER weblyn WITH PASSWORD '$DB_PASSWORD';\""
+    fi
+
+    # Check if database exists
+    if ! su - postgres -c "psql -tAc \"SELECT 1 FROM pg_database WHERE datname='weblyn'\"" | grep -q 1; then
+        su - postgres -c "psql -c \"CREATE DATABASE weblyn OWNER weblyn;\""
+    else
+        print_warning "Database 'weblyn' already exists"
+    fi
+
     # Store password securely
     echo "DB_PASSWORD=$DB_PASSWORD" > /root/weblyn_db_credentials
     chmod 600 /root/weblyn_db_credentials
-    
+
     print_status "PostgreSQL configured successfully"
     return 0
 }
+
 
 # Function to configure Redis
 configure_redis() {
@@ -403,6 +431,8 @@ configure_fail2ban() {
     print_status "Configuring fail2ban..."
     
     # Create fail2ban configuration
+    mkdir -p /etc/fail2ban
+    touch /etc/fail2ban/jail.local
     cat > /etc/fail2ban/jail.local << 'EOL'
 [DEFAULT]
 bantime = 3600
@@ -451,7 +481,6 @@ setup_directories() {
     return 0
 }
 
-# Function to download and setup project files
 setup_project_files() {
     print_status "Setting up project files..."
     
@@ -459,12 +488,12 @@ setup_project_files() {
     mkdir -p /var/www/html/public
     mkdir -p /var/www/html/admin
     mkdir -p /var/log/weblyn
-    
+
     # Download files
     BASE_URL="https://raw.githubusercontent.com/iLikeLemonR/Weblyn/EnhancedDEMV1.0/Webpage"
     
     # Download PHP files
-    for file in auth.php config.php login.php signup.php csp-report.php api.php; do
+    for file in auth.php config.php login.php signup.php csp-report.php api.php schema.sql; do
         print_status "Downloading $file..."
         if ! curl -s "${BASE_URL}/${file}" -o "/var/www/html/${file}"; then
             print_error "Failed to download $file"
@@ -473,10 +502,18 @@ setup_project_files() {
     done
     
     # Download HTML files
-    for file in login.html signup.html dashboard.html; do
-        print_status "Downloading $file..."
-        if ! curl -s "${BASE_URL}/${file}" -o "/var/www/html/public/${file}"; then
-            print_error "Failed to download $file"
+    for file in dashboard.html; do
+        print_status "Downloading dashboard.html"
+        if ! curl -s "${BASE_URL}/dashboard.html" -o "/var/www/html/public/dashboard.html"; then
+            print_error "Failed to download dashboard.html"
+            return 1
+        fi
+        if ! curl -s "${BASE_URL}/login.html" -o "/var/www/html/login.html"; then
+            print_error "Failed to download login.html"
+            return 1
+        fi
+        if ! curl -s "${BASE_URL}/signup.html" -o "/var/www/html/signup.html"; then
+            print_error "Failed to download signup.html"
             return 1
         fi
     done
@@ -504,9 +541,7 @@ setup_project_files() {
     chown -R www-data:www-data /var/www/html
     find /var/www/html -type f -exec chmod 644 {} \;
     find /var/www/html -type d -exec chmod 755 {} \;
-    
-    print_status "Project files set up successfully"
-    return 0
+
 }
 
 # Function to create environment files
@@ -668,6 +703,7 @@ main() {
     install_postgresql
     install_redis
     install_nginx
+    install_fail2ban
     
     # Configure services
     configure_nginx

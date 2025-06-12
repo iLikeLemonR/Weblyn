@@ -61,7 +61,7 @@ class API {
 // Create a global API instance
 window.api = new API();
 
-// Example usage:
+// Examples:
 /*
 // Get user profile
 api.getUserProfile()

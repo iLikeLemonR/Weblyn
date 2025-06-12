@@ -206,67 +206,74 @@ install_required_packages() {
     fi
     
     # Get latest PHP version
-    PHP_VERSION=$(get_latest_php_version)
-    if [ -z "$PHP_VERSION" ]; then
-        print_error "Could not determine latest PHP version"
-        exit 1
-    fi
-    
-    print_status "Detected PHP version: $PHP_VERSION"
-    
-    # Install required packages
-    if ! apt-get install -y \
-        nginx \
-        "$PHP_VERSION-fpm" \
-        "$PHP_VERSION-pgsql" \
-        "$PHP_VERSION-redis" \
-        "$PHP_VERSION-curl" \
-        "$PHP_VERSION-gd" \
-        "$PHP_VERSION-mbstring" \
-        "$PHP_VERSION-xml" \
-        "$PHP_VERSION-zip" \
-        postgresql \
-        postgresql-contrib \
-        redis-server \
-        fail2ban \
-        curl \
-        openssl \
-        composer; then
-        print_error "Failed to install required packages"
-        exit 1
-    fi
-    
-    # Test nginx config before starting
-    if ! nginx -t; then
-        print_error "Nginx configuration test failed. Please check /etc/nginx/conf.d/security.conf."
-        exit 1
-    fi
-    
-    # Check if system is using systemd
-    if command_exists systemctl; then
-        # Enable and start services using systemd
-        for service in nginx "${PHP_VERSION}-fpm" postgresql redis-server fail2ban; do
-            if ! systemctl enable "$service"; then
-                print_error "Failed to enable $service"
-                exit 1
-            fi
-            if ! systemctl start "$service"; then
-                print_error "Failed to start $service"
-                exit 1
-            fi
-        done
-    else
-        # Use service command for non-systemd systems
-        for service in nginx "${PHP_VERSION}-fpm" postgresql redis-server fail2ban; do
-            if ! service "$service" start; then
-                print_error "Failed to start $service"
-                exit 1
-            fi
-        done
-    fi
-    
-    print_status "Required packages installed successfully"
-}
+PHP_VERSION=$(get_latest_php_version)
+if [ -z "$PHP_VERSION" ]; then
+    print_error "Could not determine latest PHP version"
+    exit 1
+fi
+
+print_status "Detected PHP version: $PHP_VERSION"
+
+# Prevent Nginx from auto-starting during install
+print_status "Temporarily masking nginx to avoid premature start..."
+systemctl mask nginx
+
+# Install required packages
+if ! apt-get install -y \
+    nginx \
+    "$PHP_VERSION-fpm" \
+    "$PHP_VERSION-pgsql" \
+    "$PHP_VERSION-redis" \
+    "$PHP_VERSION-curl" \
+    "$PHP_VERSION-gd" \
+    "$PHP_VERSION-mbstring" \
+    "$PHP_VERSION-xml" \
+    "$PHP_VERSION-zip" \
+    postgresql \
+    postgresql-contrib \
+    redis-server \
+    fail2ban \
+    curl \
+    openssl; then
+    print_error "Failed to install required packages"
+    exit 1
+fi
+
+# Install Composer manually (in case package version is outdated)
+print_status "Installing Composer..."
+curl -sS https://getcomposer.org/installer | php
+mv composer.phar /usr/local/bin/composer
+chmod +x /usr/local/bin/composer
+
+# Unmask Nginx and write config BEFORE starting it
+print_status "Unmasking nginx and writing configuration..."
+systemctl unmask nginx
+
+# Call your config write function now (move this here in the script!)
+write_default_nginx_config
+
+# Test Nginx config BEFORE starting service
+if ! nginx -t; then
+    print_error "Nginx configuration test failed. Please check /etc/nginx/nginx.conf."
+    exit 1
+fi
+
+# Start and enable all services
+if command_exists systemctl; then
+    for service in nginx "${PHP_VERSION}-fpm" postgresql redis-server fail2ban; do
+        print_status "Enabling and starting $service..."
+        systemctl enable "$service"
+        systemctl restart "$service"
+    done
+else
+    for service in nginx "${PHP_VERSION}-fpm" postgresql redis-server fail2ban; do
+        print_status "Starting $service with legacy init system..."
+        service "$service" restart
+    done
+fi
+
+print_status "Required packages installed successfully"
+
 
 # Function to check package version
 check_package_version() {

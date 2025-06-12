@@ -40,6 +40,8 @@ fix_nginx_security_conf() {
 # Function to write default nginx configuration
 write_default_nginx_config() {
     print_status "Writing default nginx configuration..."
+    
+    # Main nginx.conf
     cat > /etc/nginx/nginx.conf <<EOL
 user www-data;
 worker_processes auto;
@@ -48,6 +50,7 @@ include /etc/nginx/modules-enabled/*.conf;
 
 events {
     worker_connections 768;
+    multi_accept on;
 }
 
 http {
@@ -56,38 +59,101 @@ http {
     tcp_nodelay on;
     keepalive_timeout 65;
     types_hash_max_size 2048;
+    server_tokens off;
+
+    # MIME types
     include /etc/nginx/mime.types;
     default_type application/octet-stream;
+
+    # Logging
     access_log /var/log/nginx/access.log;
     error_log /var/log/nginx/error.log;
+
+    # Gzip compression
     gzip on;
+    gzip_vary on;
+    gzip_proxied any;
+    gzip_comp_level 6;
+    gzip_types text/plain text/css text/xml application/json application/javascript application/xml+rss application/atom+xml image/svg+xml;
+
+    # Security headers
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self';" always;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
+
+    # Include other configurations
     include /etc/nginx/conf.d/*.conf;
     include /etc/nginx/sites-enabled/*;
 }
 EOL
-    
-    # Default site config
+
+    # Default site configuration
     mkdir -p /etc/nginx/sites-available /etc/nginx/sites-enabled
     cat > /etc/nginx/sites-available/default <<EOL
 server {
     listen 80 default_server;
     listen [::]:80 default_server;
-    root /var/www/html;
-    index index.html index.htm index.php;
     server_name _;
-    location / {
-        try_files $uri $uri/ =404;
+
+    root /var/www/html;
+    index login.html;
+
+    # Serve static files and HTML from /public
+    location ~* ^/(.*\.(css|js|html))$ {
+        alias /var/www/html/public/$1;
+        try_files $uri =404;
     }
-    location ~ \.php$ {
+
+    # Serve static files from /public (for direct /public/ access)
+    location /public/ {
+        alias /var/www/html/public/;
+        try_files $uri =404;
+    }
+
+    # Admin PHP endpoints
+    location ~ ^/admin/(.*\.php)$ {
+        alias /var/www/html/admin/$1;
         include snippets/fastcgi-php.conf;
         fastcgi_pass unix:/var/run/php/php-fpm.sock;
+        fastcgi_param SCRIPT_FILENAME /var/www/html/admin/$1;
     }
-    location ~ /\.ht {
+
+    # Main PHP endpoints (api.php, auth.php, etc.)
+    location ~ ^/(api|auth|config|csp-report|login|signup)\.php$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/var/run/php/php-fpm.sock;
+        fastcgi_param SCRIPT_FILENAME /var/www/html/$fastcgi_script_name;
+    }
+
+    # Default route: serve login.html
+    location / {
+        try_files /public/login.html =404;
+    }
+
+    # Security: deny access to hidden and sensitive files
+    location ~ /\. {
+        deny all;
+        access_log off;
+        log_not_found off;
+    }
+    location ~* \.(env|log|git|svn|htaccess|htpasswd|ini|phps|fla|psd|sh|sql|json|bak|backup|old|swp|tmp)$ {
         deny all;
     }
 }
 EOL
+
+    # Create symbolic link
     ln -sf /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default
+
+    # Create log directory
+    mkdir -p /var/log/nginx
+    chown -R www-data:www-data /var/log/nginx
+
+    # Test configuration
+    nginx -t
 }
 
 # Function to overwrite nginx security.conf with secure settings
@@ -114,7 +180,7 @@ server {
     }
 
     # Prevent access to sensitive files
-    location ~* \. (env|log|git|svn|htaccess|htpasswd|ini|phps|fla|psd|sh|sql|json)$ {
+    location ~* \.(env|log|git|svn|htaccess|htpasswd|ini|phps|fla|psd|sh|sql|json)$ {
         deny all;
     }
 }
@@ -150,16 +216,20 @@ install_required_packages() {
     if ! apt-get install -y \
         nginx \
         "$PHP_VERSION-fpm" \
-        "$PHP_VERSION-mysql" \
+        "$PHP_VERSION-pgsql" \
         "$PHP_VERSION-redis" \
         "$PHP_VERSION-curl" \
         "$PHP_VERSION-gd" \
         "$PHP_VERSION-mbstring" \
         "$PHP_VERSION-xml" \
         "$PHP_VERSION-zip" \
+        postgresql \
+        postgresql-contrib \
+        redis-server \
         fail2ban \
         curl \
-        openssl; then
+        openssl \
+        composer; then
         print_error "Failed to install required packages"
         exit 1
     fi
@@ -173,7 +243,7 @@ install_required_packages() {
     # Check if system is using systemd
     if command_exists systemctl; then
         # Enable and start services using systemd
-        for service in nginx "${PHP_VERSION}-fpm" fail2ban; do
+        for service in nginx "${PHP_VERSION}-fpm" postgresql redis-server fail2ban; do
             if ! systemctl enable "$service"; then
                 print_error "Failed to enable $service"
                 exit 1
@@ -185,7 +255,7 @@ install_required_packages() {
         done
     else
         # Use service command for non-systemd systems
-        for service in nginx "${PHP_VERSION}-fpm" fail2ban; do
+        for service in nginx "${PHP_VERSION}-fpm" postgresql redis-server fail2ban; do
             if ! service "$service" start; then
                 print_error "Failed to start $service"
                 exit 1
@@ -424,6 +494,7 @@ download_and_setup_files() {
     
     # Create necessary directories
     mkdir -p /var/www/html/public
+    mkdir -p /var/www/html/admin
     mkdir -p /var/log/weblyn
     
     # Set proper permissions
@@ -461,6 +532,173 @@ download_and_setup_files() {
     find /var/www/html -type d -exec chmod 755 {} \;
 }
 
+# Function to prompt for domain configuration
+configure_domain() {
+    print_status "Configuring domain settings..."
+    
+    read -p "Do you want to use a domain name? (y/N): " use_domain
+    if [[ $use_domain =~ ^[Yy]$ ]]; then
+        read -p "Enter your domain name (e.g., example.com): " domain_name
+        DOMAIN_NAME=$domain_name
+    else
+        DOMAIN_NAME="localhost"
+    fi
+    
+    # Update nginx configuration
+    if [ "$DOMAIN_NAME" != "localhost" ]; then
+        # Configure for domain
+        cat > /etc/nginx/sites-available/default <<EOL
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${DOMAIN_NAME};
+    root /var/www/html;
+    index index.html index.htm index.php;
+    
+    location / {
+        try_files \$uri \$uri/ =404;
+    }
+    
+    location ~ \.php$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/var/run/php/php-fpm.sock;
+    }
+    
+    location ~ /\.ht {
+        deny all;
+    }
+}
+EOL
+    else
+        # Configure for localhost
+        cat > /etc/nginx/sites-available/default <<EOL
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    root /var/www/html;
+    index index.html index.htm index.php;
+    server_name _;
+    
+    location / {
+        try_files \$uri \$uri/ =404;
+    }
+    
+    location ~ \.php$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/var/run/php/php-fpm.sock;
+    }
+    
+    location ~ /\.ht {
+        deny all;
+    }
+}
+EOL
+    fi
+    
+    # Test and reload nginx
+    nginx -t && systemctl reload nginx
+}
+
+# Function to initialize database
+initialize_database() {
+    print_status "Initializing database..."
+    
+    # Create database and user
+    sudo -u postgres psql -c "CREATE DATABASE weblyn;"
+    sudo -u postgres psql -c "CREATE USER weblyn_user WITH PASSWORD '${DB_PASSWORD}';"
+    sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE weblyn TO weblyn_user;"
+    
+    # Create tables
+    sudo -u postgres psql weblyn <<EOL
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    username VARCHAR(50) UNIQUE NOT NULL,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    role VARCHAR(20) NOT NULL DEFAULT 'user',
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE sessions (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id),
+    session_token VARCHAR(255) NOT NULL,
+    refresh_token VARCHAR(255) NOT NULL,
+    ip_address VARCHAR(45) NOT NULL,
+    user_agent TEXT NOT NULL,
+    is_valid BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMP NOT NULL,
+    last_activity TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE notifications (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id),
+    message TEXT NOT NULL,
+    is_read BOOLEAN NOT NULL DEFAULT false,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+EOL
+}
+
+# Function to create admin user
+create_admin_user() {
+    print_status "Creating admin user..."
+    
+    read -p "Enter admin username: " admin_username
+    read -p "Enter admin email: " admin_email
+    read -s -p "Enter admin password: " admin_password
+    echo
+    
+    # Hash the password
+    password_hash=$(php -r "echo password_hash('${admin_password}', PASSWORD_DEFAULT);")
+    
+    # Insert admin user
+    sudo -u postgres psql weblyn <<EOL
+INSERT INTO users (username, email, password_hash, role, is_active)
+VALUES ('${admin_username}', '${admin_email}', '${password_hash}', 'admin', true);
+EOL
+}
+
+# Function to verify services
+verify_services() {
+    print_status "Verifying services..."
+    
+    # Check nginx
+    if ! systemctl is-active --quiet nginx; then
+        print_error "Nginx is not running"
+        systemctl start nginx
+    fi
+    
+    # Check PHP-FPM
+    PHP_VERSION=$(get_latest_php_version)
+    if ! systemctl is-active --quiet "${PHP_VERSION}-fpm"; then
+        print_error "PHP-FPM is not running"
+        systemctl start "${PHP_VERSION}-fpm"
+    fi
+    
+    # Check database
+    if ! sudo -u postgres psql -lqt | cut -d \| -f 1 | grep -qw weblyn; then
+        print_error "Database 'weblyn' does not exist"
+        initialize_database
+    fi
+    
+    # Check Redis
+    if ! systemctl is-active --quiet redis-server; then
+        print_error "Redis is not running"
+        systemctl start redis-server
+    fi
+    
+    # Test web access
+    if curl -s http://localhost > /dev/null; then
+        print_status "Web server is accessible"
+    else
+        print_error "Web server is not accessible"
+    fi
+}
+
 # Main installation process
 main() {
     print_status "Starting Weblyn installation..."
@@ -481,14 +719,27 @@ main() {
     # Create environment files
     create_env_files
     
+    # Configure domain
+    configure_domain
+    
+    # Initialize database
+    initialize_database
+    
+    # Create admin user
+    create_admin_user
+    
     # Configure PHP and fail2ban security
     configure_security
     
     # Download and setup files
     download_and_setup_files
     
+    # Verify services
+    verify_services
+    
     print_status "Installation completed successfully!"
     print_status "Please check /root/weblyn_credentials for database and Redis passwords"
+    print_status "You can now access Weblyn at: http://${DOMAIN_NAME}"
 }
 
 # Run main function

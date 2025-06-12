@@ -46,10 +46,11 @@ write_default_nginx_config() {
 user www-data;
 worker_processes auto;
 pid /run/nginx.pid;
+
 include /etc/nginx/modules-enabled/*.conf;
 
 events {
-    worker_connections 768;
+    worker_connections 1024;
     multi_accept on;
 }
 
@@ -58,12 +59,12 @@ http {
     tcp_nopush on;
     tcp_nodelay on;
     keepalive_timeout 65;
-    types_hash_max_size 2048;
-    server_tokens off;
+    types_hash_max_size 4096;
 
-    # MIME types
     include /etc/nginx/mime.types;
     default_type application/octet-stream;
+
+    server_tokens off;
 
     # Logging
     access_log /var/log/nginx/access.log;
@@ -76,7 +77,7 @@ http {
     gzip_comp_level 6;
     gzip_types text/plain text/css text/xml application/json application/javascript application/xml+rss application/atom+xml image/svg+xml;
 
-    # Security headers
+    # Security headers (applied globally)
     add_header X-Frame-Options "SAMEORIGIN" always;
     add_header X-XSS-Protection "1; mode=block" always;
     add_header X-Content-Type-Options "nosniff" always;
@@ -84,11 +85,18 @@ http {
     add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self';" always;
     add_header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload" always;
 
-    # Include other configurations
+    # File upload limit (optional)
+    client_max_body_size 10M;
+
+    # FastCGI timeout tuning (optional for PHP apps)
+    fastcgi_read_timeout 60;
+
+    # Include additional configs
     include /etc/nginx/conf.d/*.conf;
     include /etc/nginx/sites-enabled/*;
 }
 EOL
+
 
     # Default site configuration
     mkdir -p /etc/nginx/sites-available /etc/nginx/sites-enabled
@@ -101,7 +109,7 @@ server {
     root /var/www/html;
     index login.html;
 
-    # Serve static and HTML files from /public
+    # Serve static files and HTML from /public
     location /public/ {
         alias /var/www/html/public/;
         try_files $uri $uri/ =404;
@@ -731,9 +739,20 @@ main() {
     # Verify services
     verify_services
     
+    # Set proper permissions
+    chown -R www-data:www-data /var/www/html
+    find /var/www/html -type d -exec chmod 755 {} \;
+    find /var/www/html -type f -exec chmod 644 {} \;
+    chmod -R 775 /var/log/weblyn
+    chown -R www-data:www-data /var/log/weblyn
+    
+    print_status "Final verification..."
+    nginx -t && print_status "Nginx config OK" || print_error "Nginx config error!"
+    systemctl status nginx --no-pager | grep -q running && print_status "Nginx running" || print_error "Nginx not running!"
+    systemctl status postgresql --no-pager | grep -q running && print_status "PostgreSQL running" || print_error "PostgreSQL not running!"
+    systemctl status redis-server --no-pager | grep -q running && print_status "Redis running" || print_error "Redis not running!"
     print_status "Installation completed successfully!"
-    print_status "Please check /root/weblyn_credentials for database and Redis passwords"
-    print_status "You can now access Weblyn at: http://${DOMAIN_NAME}"
+    print_status "Access your site at: http://localhost or your configured domain."
 }
 
 # Run main function

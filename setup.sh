@@ -101,13 +101,7 @@ server {
     root /var/www/html;
     index login.html;
 
-    # Serve static files and HTML from /public
-    location ~* ^/(.*\.(css|js|html))$ {
-        alias /var/www/html/public/$1;
-        try_files $1 =404;
-    }
-
-    # Serve static files from /public (for direct /public/ access)
+    # Serve static and HTML files from /public
     location /public/ {
         alias /var/www/html/public/;
         try_files $uri $uri/ =404;

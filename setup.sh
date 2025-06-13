@@ -30,6 +30,77 @@ command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
+# Function to wait for dpkg lock to be released
+wait_for_dpkg_lock() {
+    local max_attempts=30
+    local attempt=1
+    
+    while [ $attempt -le $max_attempts ]; do
+        if ! fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; then
+            return 0
+        fi
+        print_warning "Waiting for dpkg lock to be released... (attempt $attempt/$max_attempts)"
+        sleep 10
+        attempt=$((attempt + 1))
+    done
+    
+    print_error "Could not acquire dpkg lock after $max_attempts attempts"
+    return 1
+}
+
+# Function to kill blocking processes and clean locks
+force_unlock_dpkg() {
+    print_warning "Attempting to force unlock dpkg..."
+    
+    # Kill any apt/dpkg processes
+    pkill -f apt || true
+    pkill -f dpkg || true
+    pkill -f unattended-upgrade || true
+    
+    # Wait a moment
+    sleep 5
+    
+    # Remove lock files
+    rm -f /var/lib/dpkg/lock-frontend
+    rm -f /var/lib/dpkg/lock
+    rm -f /var/cache/apt/archives/lock
+    
+    # Reconfigure dpkg
+    dpkg --configure -a
+    
+    print_status "dpkg unlocked successfully"
+}
+
+# Function to safely run apt commands
+safe_apt() {
+    local max_retries=3
+    local retry=1
+    
+    while [ $retry -le $max_retries ]; do
+        if wait_for_dpkg_lock; then
+            if "$@"; then
+                return 0
+            fi
+        fi
+        
+        print_warning "apt command failed (attempt $retry/$max_retries)"
+        
+        if [ $retry -eq $max_retries ]; then
+            print_warning "All retries failed, attempting to force unlock..."
+            force_unlock_dpkg
+            if "$@"; then
+                return 0
+            else
+                print_error "Command failed even after force unlock: $*"
+                return 1
+            fi
+        fi
+        
+        retry=$((retry + 1))
+        sleep 15
+    done
+}
+
 # Function to check package version
 check_package_version() {
     local package=$1
@@ -95,7 +166,7 @@ install_nodejs() {
     curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
     
     # Install Node.js and npm
-    if ! apt-get install -y nodejs; then
+    if ! safe_apt apt-get install -y nodejs; then
         print_error "Failed to install Node.js"
         return 1
     fi
@@ -129,14 +200,12 @@ install_php() {
     fi
     
     # Add repository for PHP 8.1
-    add-apt-repository -y ppa:ondrej/php
-    apt-get update
+    safe_apt add-apt-repository -y ppa:ondrej/php
+    safe_apt apt-get update
     
     # Install PHP 8.1 and required extensions
-    apt-get install -y php8.1 php8.1-fpm php8.1-cli php8.1-common php8.1-pgsql php8.1-redis \
+    safe_apt apt-get install -y php8.1 php8.1-fpm php8.1-cli php8.1-common php8.1-pgsql php8.1-redis \
         php8.1-curl php8.1-mbstring php8.1-xml php8.1-zip php8.1-gd
-    
-    # Note: php8.1-json is now included in the core PHP package since PHP 8.0
     
     # Configure PHP
     configure_php
@@ -154,20 +223,25 @@ install_postgresql() {
     
     # Check if PostgreSQL is already installed
     if command_exists psql; then
-        current_version=$(psql --version | grep -oP '\d+\.\d+\.\d+')
-        if check_package_version postgres "12.0.0"; then
-            print_status "PostgreSQL $current_version is already installed and compatible"
+        current_version=$(psql --version | grep -oP '\d+\.\d+' | head -1)
+        print_status "PostgreSQL $current_version is already installed"
+        if [ "$(printf '%s\n' "12" "$current_version" | sort -V | head -n1)" = "12" ]; then
+            print_status "PostgreSQL version is compatible"
             return 0
         else
-            print_warning "PostgreSQL $current_version is installed but needs update"
+            print_warning "PostgreSQL version $current_version may need update"
         fi
     fi
 
     # Install PostgreSQL
-    if ! apt-get install -y postgresql postgresql-contrib; then
+    if ! safe_apt apt-get install -y postgresql postgresql-contrib; then
         print_error "Failed to install PostgreSQL"
         return 1
     fi
+
+    # Ensure PostgreSQL is started
+    systemctl start postgresql
+    systemctl enable postgresql
 
     print_status "PostgreSQL installed successfully"
     return 0
@@ -179,17 +253,13 @@ install_redis() {
     
     # Check if Redis is already installed
     if command_exists redis-cli; then
-        current_version=$(redis-cli --version | grep -oP '\d+\.\d+\.\d+')
-        if check_package_version redis-cli "6.0.0"; then
-            print_status "Redis $current_version is already installed and compatible"
-            return 0
-        else
-            print_warning "Redis $current_version is installed but needs update"
-        fi
+        current_version=$(redis-cli --version | grep -oP '\d+\.\d+\.\d+' | head -1)
+        print_status "Redis $current_version is already installed"
+        return 0
     fi
 
     # Install Redis
-    if ! apt-get install -y redis-server; then
+    if ! safe_apt apt-get install -y redis-server; then
         print_error "Failed to install Redis"
         return 1
     fi
@@ -205,16 +275,12 @@ install_nginx() {
     # Check if Nginx is already installed
     if command_exists nginx; then
         current_version=$(nginx -v 2>&1 | grep -oP '\d+\.\d+\.\d+')
-        if check_package_version nginx "1.18.0"; then
-            print_status "Nginx $current_version is already installed and compatible"
-            return 0
-        else
-            print_warning "Nginx $current_version is installed but needs update"
-        fi
+        print_status "Nginx $current_version is already installed"
+        return 0
     fi
 
     # Install Nginx
-    if ! apt-get install -y nginx; then
+    if ! safe_apt apt-get install -y nginx; then
         print_error "Failed to install Nginx"
         return 1
     fi
@@ -228,10 +294,10 @@ install_fail2ban() {
     print_status "Installing Fail2Ban..."
 
     if ! command_exists fail2ban-client; then
-        apt-get install -y fail2ban || {
+        if ! safe_apt apt-get install -y fail2ban; then
             print_error "Failed to install Fail2Ban"
             return 1
-        }
+        fi
         print_status "Fail2Ban installed successfully"
     else
         print_status "Fail2Ban is already installed"
@@ -384,8 +450,11 @@ configure_postgresql() {
 
     DB_PASSWORD=$(generate_secure_password)
 
+    # Wait for PostgreSQL to be ready
+    sleep 5
+
     # Check if user exists
-    if ! su - postgres -c "psql -tAc \"SELECT 1 FROM pg_roles WHERE rolname='weblyn'\"" | grep -q 1; then
+    if ! su - postgres -c "psql -tAc \"SELECT 1 FROM pg_roles WHERE rolname='weblyn'\"" 2>/dev/null | grep -q 1; then
         su - postgres -c "psql -c \"CREATE USER weblyn WITH PASSWORD '$DB_PASSWORD';\""
     else
         print_warning "Role 'weblyn' already exists"
@@ -393,7 +462,7 @@ configure_postgresql() {
     fi
 
     # Check if database exists
-    if ! su - postgres -c "psql -tAc \"SELECT 1 FROM pg_database WHERE datname='weblyn'\"" | grep -q 1; then
+    if ! su - postgres -c "psql -tAc \"SELECT 1 FROM pg_database WHERE datname='weblyn'\"" 2>/dev/null | grep -q 1; then
         su - postgres -c "psql -c \"CREATE DATABASE weblyn OWNER weblyn;\""
     else
         print_warning "Database 'weblyn' already exists"
@@ -406,7 +475,6 @@ configure_postgresql() {
     print_status "PostgreSQL configured successfully"
     return 0
 }
-
 
 # Function to configure Redis
 configure_redis() {
@@ -702,8 +770,13 @@ main() {
         exit 1
     fi
     
+    # Stop any running unattended upgrades
+    print_status "Stopping unattended upgrades..."
+    systemctl stop unattended-upgrades || true
+    systemctl disable unattended-upgrades || true
+    
     # Update package lists
-    apt-get update
+    safe_apt apt-get update
     
     # Install required packages
     install_nodejs

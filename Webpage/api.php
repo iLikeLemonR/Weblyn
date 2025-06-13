@@ -164,6 +164,102 @@ switch ($endpoint) {
         }
         break;
         
+    case 'users':
+        if ($method === 'GET') {
+            // Check if user is admin
+            if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
+                http_response_code(403);
+                echo json_encode(['error' => 'Unauthorized access']);
+                exit;
+            }
+            
+            try {
+                $pdo = new PDO(
+                    "mysql:host={$config['DB_HOST']};dbname={$config['DB_NAME']};charset=utf8mb4",
+                    $config['DB_USER'],
+                    $config['DB_PASSWORD'],
+                    [
+                        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                        PDO::ATTR_EMULATE_PREPARES => false
+                    ]
+                );
+                
+                $stmt = $pdo->prepare("
+                    SELECT id, username, email, role, created_at, last_login 
+                    FROM users 
+                    ORDER BY created_at DESC
+                ");
+                $stmt->execute();
+                $users = $stmt->fetchAll();
+                
+                echo json_encode(['success' => true, 'data' => $users]);
+            } catch (PDOException $e) {
+                error_log("Database error: " . $e->getMessage());
+                http_response_code(500);
+                echo json_encode(['error' => 'Internal server error']);
+            }
+        } elseif ($method === 'DELETE') {
+            // Check if user is admin
+            if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'admin') {
+                http_response_code(403);
+                echo json_encode(['error' => 'Unauthorized access']);
+                exit;
+            }
+            
+            $userId = isset($_GET['id']) ? $_GET['id'] : null;
+            if (!$userId) {
+                http_response_code(400);
+                echo json_encode(['error' => 'User ID is required']);
+                exit;
+            }
+            
+            try {
+                $pdo = new PDO(
+                    "mysql:host={$config['DB_HOST']};dbname={$config['DB_NAME']};charset=utf8mb4",
+                    $config['DB_USER'],
+                    $config['DB_PASSWORD'],
+                    [
+                        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                        PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                        PDO::ATTR_EMULATE_PREPARES => false
+                    ]
+                );
+                
+                // Start transaction
+                $pdo->beginTransaction();
+                
+                // Delete user's notifications
+                $stmt = $pdo->prepare("DELETE FROM notifications WHERE user_id = ?");
+                $stmt->execute([$userId]);
+                
+                // Delete user's audit logs
+                $stmt = $pdo->prepare("DELETE FROM audit_logs WHERE user_id = ?");
+                $stmt->execute([$userId]);
+                
+                // Delete the user
+                $stmt = $pdo->prepare("DELETE FROM users WHERE id = ?");
+                $stmt->execute([$userId]);
+                
+                // Commit transaction
+                $pdo->commit();
+                
+                echo json_encode(['success' => true, 'message' => 'User deleted successfully']);
+            } catch (PDOException $e) {
+                // Rollback transaction on error
+                if ($pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
+                error_log("Database error: " . $e->getMessage());
+                http_response_code(500);
+                echo json_encode(['error' => 'Internal server error']);
+            }
+        } else {
+            http_response_code(405);
+            echo json_encode(['error' => 'Method not allowed']);
+        }
+        break;
+        
     case 'notifications':
         if ($method === 'GET') {
             // Get user notifications
@@ -194,6 +290,46 @@ switch ($endpoint) {
                 error_log("Database error: " . $e->getMessage());
                 http_response_code(500);
                 echo json_encode(['error' => 'Internal server error']);
+            }
+        } elseif ($method === 'POST') {
+            validate_csrf_token();
+            
+            $data = json_decode(file_get_contents('php://input'), true);
+            if (!$data || !isset($data['notification_id']) || !isset($data['action'])) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Invalid request data']);
+                exit;
+            }
+            
+            if ($data['action'] === 'mark_read') {
+                try {
+                    $pdo = new PDO(
+                        "mysql:host={$config['DB_HOST']};dbname={$config['DB_NAME']};charset=utf8mb4",
+                        $config['DB_USER'],
+                        $config['DB_PASSWORD'],
+                        [
+                            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                            PDO::ATTR_EMULATE_PREPARES => false
+                        ]
+                    );
+                    
+                    $stmt = $pdo->prepare("
+                        UPDATE notifications 
+                        SET is_read = 1 
+                        WHERE id = ? AND user_id = ?
+                    ");
+                    $stmt->execute([$data['notification_id'], $_SESSION['user_id']]);
+                    
+                    echo json_encode(['success' => true, 'message' => 'Notification marked as read']);
+                } catch (PDOException $e) {
+                    error_log("Database error: " . $e->getMessage());
+                    http_response_code(500);
+                    echo json_encode(['error' => 'Internal server error']);
+                }
+            } else {
+                http_response_code(400);
+                echo json_encode(['error' => 'Invalid action']);
             }
         } else {
             http_response_code(405);

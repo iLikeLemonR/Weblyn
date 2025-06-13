@@ -516,6 +516,14 @@ setup_project_files() {
             print_error "Failed to download signup.html"
             return 1
         fi
+        if ! curl -s "${BASE_URL}/admin.html" -o "/var/www/html/admin.html"; then
+            print_error "Failed to download admin.html"
+            return 1
+        fi
+         if ! curl -s "${BASE_URL}/admin.js" -o "/var/www/html/admin.js"; then
+            print_error "Failed to download admin.js"
+            return 1
+        fi
     done
     
     # Download admin files

@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard</title>
+    <link rel="stylesheet" href="dashcss.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <!-- Background animation -->
+    <div class="bg-animation">
+        <div class="bg-gradient"></div>
+    </div>
+
+    <!-- Admin Dashboard content -->
+    <div class="dashboard">
+        <div class="sidebar">
+            <div class="logo">
+                <i class="fas fa-server"></i>
+                <span>Admin Panel</span>
+            </div>
+            <nav>
+                <ul>
+                    <li class="active"><a href="#overview"><i class="fas fa-chart-line"></i> Overview</a></li>
+                    <li><a href="#users"><i class="fas fa-users"></i> User Management</a></li>
+                    <li><a href="#notifications"><i class="fas fa-bell"></i> Notifications</a></li>
+                    <li><a href="#settings"><i class="fas fa-cog"></i> Settings</a></li>
+                    <li><a href="logout.php"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
+                </ul>
+            </nav>
+        </div>
+
+        <div class="main-content">
+            <div class="header">
+                <div class="welcome-section">
+                    <h1 class="welcome">Admin Dashboard</h1>
+                    <div class="user">
+                        <div class="avatar" id="userAvatar">A</div>
+                        <div class="username" id="username">Admin</div>
+                    </div>
+                </div>
+                <div class="header-actions">
+                    <div class="notifications-bell">
+                        <i class="fas fa-bell"></i>
+                        <span class="notification-badge" id="notificationCount">0</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="live-clock">
+                <span id="hours">00</span><span class="colon">:</span><span id="minutes">00</span><span class="colon">:</span><span id="seconds">00</span><span id="pm/am"> --</span>
+            </div>
+
+            <div class="stats-container">
+                <div id="cpu-card" class="stat-card">
+                    <div class="stat-title">CPU Usage</div>
+                    <div class="stat-subtitle" id="coresTotal">-- Cores</div>
+                    <div class="stat-value" id="cpuText">--%</div>
+                    <div class="stat-change" id="cpu-card-stat-change">--%</div>
+                    <div class="period">in last second</div>
+                    <div class="shape diamond"></div>
+                </div>
+                
+                <div id="memory-card" class="stat-card">
+                    <div class="stat-title">Memory Usage</div>
+                    <div class="stat-subtitle" id="memTotal">--GB / --GB (Free: --GB)</div>
+                    <div class="stat-value" id="memText">--%</div>
+                    <div class="stat-change" id="mem-card-stat-change">--%</div>
+                    <div class="period">in last second</div>
+                    <div class="shape square"></div>
+                </div>
+                
+                <div id="disk-card" class="stat-card">
+                    <div class="stat-title">Disk Usage</div>
+                    <div class="stat-subtitle" id="diskTotal">--GB / --GB (Free: --GB)</div>
+                    <div class="stat-value" id="diskText">--%</div>
+                    <div class="stat-change" id="disk-card-stat-change">--%</div>
+                    <div class="period">in last second</div>
+                    <div class="shape rectangle"></div>
+                </div>
+            </div>
+
+            <div class="admin-sections">
+                <div id="user-management" class="admin-section">
+                    <h2>User Management</h2>
+                    <div class="user-list" id="userList">
+                        <!-- User list will be populated by JavaScript -->
+                    </div>
+                </div>
+
+                <div id="notifications-panel" class="admin-section">
+                    <h2>Recent Notifications</h2>
+                    <div class="notification-list" id="notificationList">
+                        <!-- Notifications will be populated by JavaScript -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Custom cursor elements -->
+    <div class="cursor"></div>
+    
+    <!-- Scripts -->
+    <script src="dashjs.js"></script>
+    <script src="admin.js"></script>
+</body>
+</html> 
